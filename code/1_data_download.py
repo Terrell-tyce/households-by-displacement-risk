@@ -1,22 +1,3 @@
-
-# ==========================================================================
-# ==========================================================================
-# ==========================================================================
-# Data Download
-# Note: As of 2020, the Census API has been somewhat unreliable. We encourage
-# everyone to save all their downloads so you don't run into delays while
-# working on your project. Don't rely on the API to download everyday.
-# ==========================================================================
-# ==========================================================================
-# ==========================================================================
-
-#!/usr/bin/env python
-# coding: utf-8
-
-# ==========================================================================
-# Import Libraries
-# ==========================================================================
-
 import census
 import pandas as pd
 import numpy as np
@@ -27,7 +8,7 @@ from shapely.geometry import Point
 from pyproj import Proj
 import matplotlib.pyplot as plt
 import os
-import requests
+from pathlib import Path
 
 pd.set_option('display.max_columns', None)
 pd.set_option('display.max_rows', None)
@@ -43,23 +24,17 @@ FILE_API = os.path.join(BASE_DIR, 'api_key.txt')
 
 with open(FILE_API, 'r') as file:
     key = file.read()
-    
+    print(key)
+
 key = key.strip()
 c = census.Census(key)
 
-# ==========================================================================
-# Choose Cities
-# ==========================================================================
-
-# Choose City and Census Tracts of Interest
-# --------------------------------------------------------------------------
-# To get city data, run the following code in the terminal
-# `python data.py <city name>`
-# Example: python data.py Atlanta
 
 city_name = 'Sacramento'
 state = '06'
 FIPS = ['067']
+
+
 
 sql_query='state:{} county:*'.format(state)
 
@@ -67,10 +42,54 @@ sql_query='state:{} county:*'.format(state)
 # Create Filter Function
 # --------------------------------------------------------------------------
 
+
 def filter_FIPS(df):
     df = df[df['county'].isin(FIPS)]
     return df
+    
+def load_nhgis_csv(path):
+    """Load NHGIS CSV and drop description row"""
+    return pd.read_csv(path, skiprows=[1], dtype=str)
 
+def read_nhgis(path):
+    df = pd.read_csv(path)
+    meta = df.iloc[0]          # human-readable labels
+    df = df.iloc[1:].reset_index(drop=True)
+    return df, meta
+
+def nhgis_to_fips(df):
+    """
+    Convert NHGIS GISJOIN to standard 11-digit tract FIPS
+    GISJOIN format: G06 067 020100
+    """
+    df['FIPS'] = (
+        df['GISJOIN']
+        .str.replace('G', '', regex=False)
+        .str.slice(0, 2)   # state
+        + df['GISJOIN'].str.slice(2, 5)   # county
+        + df['GISJOIN'].str.slice(5, 11)  # tract
+    )
+    return df
+
+def audit_renames(rename_dict, meta_dict, title=None):
+    if title:
+        print(f"\n{'='*80}\n{title}\n{'='*80}")
+
+    for old, new in rename_dict.items():
+        label = meta_dict.get(old, '⚠️ NO METADATA FOUND')
+
+        print(f"NHGIS label : {label}")
+        print(f"Column code : {old}")
+        print(f"Renamed to  : {new}")
+        print("-" * 80)
+
+
+def nhgis_metadata(path):
+    """
+    Returns dict: {column_code: description}
+    """
+    meta = pd.read_csv(path, nrows=2, header=None)
+    return dict(zip(meta.iloc[0], meta.iloc[1]))
 
 # ==========================================================================
 # Download Raw Data
@@ -117,10 +136,11 @@ df_vars_23 = df_vars_23 + var_list
 
 # Run API query
 # --------------------------------------------------------------------------
+# NOTE: Memphis is located in two states so the query looks different
+# same for Boston
 
-var_dict_acs5 = c.acs5.get(df_vars_23, geo = {'for': 'tract:*',
-                                 'in': sql_query}, year=2023)
 
+var_dict_acs5 = c.acs5.get(df_vars_23, geo = {'for': 'tract:*','in': sql_query}, year=2023)
 
 # Convert and Rename Variables
 # --------------------------------------------------------------------------
@@ -206,24 +226,6 @@ df_vars_23 = df_vars_23.rename(columns = {'B03002_001E':'pop_23',
                                           'B19001_016E':'I_200000_23',
                                           'B19001_017E':'I_201000_23'})
 
-# Add 2010 Decennial Census download
-var_dict_2010 = c.sf1.get(
-    ('P005001', 'P005003', 'H004002', 'H004003'),  # Pop, white, owner, renter
-    geo = {'for': 'tract:*', 'in': sql_query}, 
-    year=2010)
-
-df_vars_2010 = pd.DataFrame.from_dict(var_dict_2010)
-df_vars_2010['FIPS'] = df_vars_2010['state'] + df_vars_2010['county'] + df_vars_2010['tract']
-df_vars_2010 = filter_FIPS(df_vars_2010)
-df_vars_2010 = df_vars_2010.rename(columns={
-    'P005001': 'pop_10',
-    'P005003': 'white_10',
-    'H004002': 'ohu_10',
-    'H004003': 'rhu_10'
-})
-
-
-
 # Download ACS 2012 5-Year Estimates
 # --------------------------------------------------------------------------
 # Note: If additional cities are added, make sure to change create_lag_vars.r
@@ -278,8 +280,7 @@ df_vars_12=['B25077_001E',
 # NOTE: Memphis is located in two states so the query looks different
 
 
-var_dict_acs5 = c.acs5.get(df_vars_12, geo = {'for': 'tract:*',
-                                 'in': sql_query}, year=2012)
+var_dict_acs5 = c.acs5.get(df_vars_12, geo = {'for': 'tract:*','in': sql_query}, year=2012)
 
 
 # Convert and Rename Variabls
@@ -335,65 +336,269 @@ df_vars_12 = df_vars_12.rename(columns = {'B25077_001E':'mhval_12',
                                           'B07010_066E':'mov_fa_76000_more_12',
                                           'B06011_001E':'iinc_12'})
 
-# ==========================================================================
-# NHGIS — Census 2000 SF3 (CSV)
-# ==========================================================================
+### Decennial Census 2000 Variables
+# ======================================================================
+# Decennial Census 2000 — NHGIS
+# ======================================================================
 
-nhgis_2000_file = input_path + 'nhgis_2000_ca.csv'
-df_00 = pd.read_csv(nhgis_2000_file, dtype=str)
-df_00 = df_00.drop(index=1)  # drop second row with metadata
+path_sf1_00 = input_path + "nhgis_ca_sf1_2000_tract.csv"
+path_sf3_00 = input_path + "nhgis_ca_sf3_2000_tract.csv"
 
-df_00['FIPS'] = (
-    df_00['STATEA'].str.zfill(2) +
-    df_00['COUNTYA'].str.zfill(3) +
-    df_00['TRACTA'].str.zfill(6)
-)
+df_sf1_00 = load_nhgis_csv(path_sf1_00)
+df_sf3_00 = load_nhgis_csv(path_sf3_00)
 
-df_00 = df_00[df_00['COUNTYA'].isin(FIPS)]
+df_sf1_00 = nhgis_to_fips(df_sf1_00)
+df_sf3_00 = nhgis_to_fips(df_sf3_00)
 
-num_cols = df_00.columns.difference(['GISJOIN','YEAR','STATEA','COUNTYA','TRACTA','FIPS'])
-df_00[num_cols] = df_00[num_cols].apply(pd.to_numeric, errors='coerce')
+# filter to Sacramento County
+df_sf1_00 = df_sf1_00[df_sf1_00['COUNTYA'].isin(FIPS)]
+df_sf3_00 = df_sf3_00[df_sf3_00['COUNTYA'].isin(FIPS)]
 
-df_vars_00 = df_00.rename(columns={
-    'GKT001':'total_25_00',
-    'GKT013':'male_25_col_bd_00',
-    'GKT014':'male_25_col_md_00',
-    'GKT015':'male_25_col_psd_00',
-    'GKT016':'male_25_col_phd_00',
-    'GKT029':'female_25_col_bd_00',
-    'GKT030':'female_25_col_md_00',
-    'GKT031':'female_25_col_psd_00',
-    'GKT032':'female_25_col_phd_00',
-    'GMX001':'hh_00',
-    'GNW001':'hinc_00',
-    'F9C001':'ohu_00',
-    'F9C002':'rhu_00',
-    'E001001':'pop_00',
-    'E001003':'white_00'
+# -------------------------------
+# Rename variables (MATCHES YOUR SCRIPT)
+# -------------------------------
+df_sf1_00['total_pop_00'] = df_sf1_00['FMR001']+df_sf1_00['FMR002']+df_sf1_00['FMR003']+df_sf1_00['FMR004']+df_sf1_00['FMR005']+df_sf1_00['FMR006']+df_sf1_00['FMR007']							
+
+df_sf1_00 = df_sf1_00.rename(columns={
+    'total_pop_00': 'pop_00',      # Total population
+    'FMR001': 'white_00',    # White alone
+    'FKI001': 'hu_00',
+    'FKM001': 'ohu_00',
+    'FKN002': 'rhu_00'
 })
 
+sfl_dict_00 = {
+    'total_pop_00': 'pop_00',      # Total population
+    'FMR001': 'white_00',    # White alone
+    'FKI001': 'hu_00',
+    'FKM001': 'ohu_00',
+    'FKN002': 'rhu_00'
+}
+
+df_sf3_00['total households'] = df_sf3_00['GI6001']+df_sf3_00['GI6002']+df_sf3_00['GI6003']+df_sf3_00['GI6004']+df_sf3_00['GI6005']	
+
+sf3_dict_00 = {
+    'GKR001': 'total_25_00',
+
+    'GKT013': 'male_25_col_bd_00',
+    'GKT014': 'male_25_col_md_00',
+    'GKT015': 'male_25_col_psd_00',
+    'GKT016': 'male_25_col_phd_00',
+
+    'GKT029': 'female_25_col_bd_00',
+    'GKT030': 'female_25_col_md_00',
+    'GKT031': 'female_25_col_psd_00',
+    'GKT031': 'female_25_col_phd_00',
+
+    'GB7001': 'mhval_00',
+    'GBO001': 'mrent_00',
+    'total households': 'hh_00',
+    'GMY001': 'hinc_00',
+
+    # income bins
+    'GMX001': 'I_10000_00',
+    'GMX002': 'I_15000_00',
+    'GMX003': 'I_20000_00',
+    'GMX004': 'I_25000_00',
+    'GMX005': 'I_30000_00',
+    'GMX006': 'I_35000_00',
+    'GMX007': 'I_40000_00',
+    'GMX008': 'I_45000_00',
+    'GMX009': 'I_50000_00',
+    'GMX010': 'I_60000_00',
+    'GMX011': 'I_75000_00',
+    'GMX012': 'I_100000_00',
+    'GMX013': 'I_125000_00',
+    'GMX014': 'I_150000_00',
+    'GMX015': 'I_200000_00',
+    'GMX016': 'I_201000_00'
+}
+		
+
+df_sf3_00 = df_sf3_00.rename(columns={
+    'GKR001': 'total_25_00',
+
+    'GKT013': 'male_25_col_bd_00',
+    'GKT014': 'male_25_col_md_00',
+    'GKT015': 'male_25_col_psd_00',
+    'GKT016': 'male_25_col_phd_00',
+
+    'GKT029': 'female_25_col_bd_00',
+    'GKT030': 'female_25_col_md_00',
+    'GKT031': 'female_25_col_psd_00',
+    'GKT031': 'female_25_col_phd_00',
+
+    'GB7001': 'mhval_00',
+    'GBO001': 'mrent_00',
+    'total households': 'hh_00',
+    'GMY001': 'hinc_00',
+
+    # income bins
+    'GMX001': 'I_10000_00',
+    'GMX002': 'I_15000_00',
+    'GMX003': 'I_20000_00',
+    'GMX004': 'I_25000_00',
+    'GMX005': 'I_30000_00',
+    'GMX006': 'I_35000_00',
+    'GMX007': 'I_40000_00',
+    'GMX008': 'I_45000_00',
+    'GMX009': 'I_50000_00',
+    'GMX010': 'I_60000_00',
+    'GMX011': 'I_75000_00',
+    'GMX012': 'I_100000_00',
+    'GMX013': 'I_125000_00',
+    'GMX014': 'I_150000_00',
+    'GMX015': 'I_200000_00',
+    'GMX016': 'I_201000_00'
+})
+
+df_vars_00 = df_sf1_00.merge(
+    df_sf3_00.drop(columns=['COUNTYA']),
+    on='FIPS',
+    how='left'
+)
+
+
+# ======================================================================
+# Decennial Census 1990 — NHGIS
+# ======================================================================
+
+path_sf3_90 = input_path + "nhgis_ca_sf3_1990_tract.csv"
+
+df_vars_90 = load_nhgis_csv(path_sf3_90)
+df_vars_90 = nhgis_to_fips(df_vars_90)
+
+df_vars_90 = df_vars_90[df_vars_90['COUNTYA'].isin(FIPS)]
+df_vars_90['total_pop_90'] = df_vars_90['E4S001']+df_vars_90['E4S002']+df_vars_90['E4S003']+df_vars_90['E4S004']+df_vars_90['E4S005']		
+
+df_vars_90 = df_vars_90.rename(columns={
+    # population & race
+    'total_pop_90': 'pop_90',
+    'E4S001': 'white_90',
+
+    # housing totals
+    'EXQ001': 'hu_90',        # total housing units
+    'EYP001': 'ohu_90',       # occupied housing units
+    'EZ2001': 'owner_90',     # owner-occupied
+    'EZ2002': 'renter_90',    # renter-occupied
+
+    # education (25+)
+    'E33001': 'total_25_col_9th_90',
+    'E33002': 'total_25_col_12th_90',
+    'E33003': 'total_25_col_hs_90',
+    'E33004': 'total_25_col_sc_90',
+    'E33005': 'total_25_col_ad_90',
+    'E33006': 'total_25_col_bd_90',
+    'E33007': 'total_25_col_gd_90',
+
+    # income
+    'E4U001': 'hinc_90',       # median household income (1989)
+
+    # housing costs
+    'EYU001': 'mrent_90',      # median gross rent
+    'EZI001': 'mhval_90',      # median home value
+
+    # household income bins
+    'E4T001': 'I_5000_90',
+    'E4T002': 'I_10000_90',
+    'E4T003': 'I_12500_90',
+    'E4T004': 'I_15000_90',
+    'E4T005': 'I_17500_90',
+    'E4T006': 'I_20000_90',
+    'E4T007': 'I_22500_90',
+    'E4T008': 'I_25000_90',
+    'E4T009': 'I_27500_90',
+    'E4T010': 'I_30000_90',
+    'E4T011': 'I_32500_90',
+    'E4T012': 'I_35000_90',
+    'E4T013': 'I_37500_90',
+    'E4T014': 'I_40000_90',
+    'E4T015': 'I_42500_90',
+    'E4T016': 'I_45000_90',
+    'E4T017': 'I_47500_90',
+    'E4T018': 'I_50000_90',
+    'E4T019': 'I_55000_90',
+    'E4T020': 'I_60000_90',
+    'E4T021': 'I_75000_90',
+    'E4T022': 'I_100000_90',
+    'E4T023': 'I_125000_90',
+    'E4T024': 'I_150000_90',
+    'E4T025': 'I_150001_90',
+})
+sf3_dict_90 = {
+    # population & race
+    'total_pop_90': 'pop_90',
+    'E4S001': 'white_90',
+
+    # housing totals
+    'EXQ001': 'hu_90',        # total housing units
+    'EYP001': 'ohu_90',       # occupied housing units
+    'EZ2001': 'owner_90',     # owner-occupied
+    'EZ2002': 'renter_90',    # renter-occupied
+
+    # education (25+)
+    'E33001': 'total_25_col_9th_90',
+    'E33002': 'total_25_col_12th_90',
+    'E33003': 'total_25_col_hs_90',
+    'E33004': 'total_25_col_sc_90',
+    'E33005': 'total_25_col_ad_90',
+    'E33006': 'total_25_col_bd_90',
+    'E33007': 'total_25_col_gd_90',
+
+    # income
+    'E4U001': 'hinc_90',       # median household income (1989)
+
+    # housing costs
+    'EYU001': 'mrent_90',      # median gross rent
+    'EZI001': 'mhval_90',      # median home value
+
+    # household income bins
+    'E4T001': 'I_5000_90',
+    'E4T002': 'I_10000_90',
+    'E4T003': 'I_12500_90',
+    'E4T004': 'I_15000_90',
+    'E4T005': 'I_17500_90',
+    'E4T006': 'I_20000_90',
+    'E4T007': 'I_22500_90',
+    'E4T008': 'I_25000_90',
+    'E4T009': 'I_27500_90',
+    'E4T010': 'I_30000_90',
+    'E4T011': 'I_32500_90',
+    'E4T012': 'I_35000_90',
+    'E4T013': 'I_37500_90',
+    'E4T014': 'I_40000_90',
+    'E4T015': 'I_42500_90',
+    'E4T016': 'I_45000_90',
+    'E4T017': 'I_47500_90',
+    'E4T018': 'I_50000_90',
+    'E4T019': 'I_55000_90',
+    'E4T020': 'I_60000_90',
+    'E4T021': 'I_75000_90',
+    'E4T022': 'I_100000_90',
+    'E4T023': 'I_125000_90',
+    'E4T024': 'I_150000_90',
+    'E4T025': 'I_150001_90',
+}
+
+meta_90     = nhgis_metadata(input_path + 'nhgis_ca_sf3_1990_tract.csv')
+meta_00_sf1 = nhgis_metadata(input_path + 'nhgis_ca_sf1_2000_tract.csv')
+meta_00_sf3 = nhgis_metadata(input_path + 'nhgis_ca_sf3_2000_tract.csv')
+
+audit_renames(sf3_dict_90, meta_90, title="1990 SF3 Variable Renames")
+audit_renames(sfl_dict_00, meta_00_sf1, title="2000 SF1 Variable Renames")
+audit_renames(sf3_dict_00, meta_00_sf3, title="2000 SF3 Variable Renames")
 
 # ==========================================================================
-# EXPORTS
+# Export Files
 # ==========================================================================
-# Merge 2012 & 2018 files - same geometry
+# Note: ouput paths can be altered by changing the 'output path variable above'
 
-df_vars_00.to_csv(
-    output_path + "downloads/" + city_name.replace(" ", "") + "census_00_2023.csv",
-    index=False
-)
+# Merge 2012 & 2023 files they are both tablulated on 2010 census tract and will be until 2025 acs5 yr
+df_vars_summ = df_vars_23.merge(df_vars_12, on ='FIPS')
 
-df_vars_2010.to_csv(
-    output_path+"downloads/"+city_name.replace(" ", "")+'census_10_2023.csv',
-    index=False)
+from pathlib import Path
 
-df_vars_12.to_csv(
-    output_path + "downloads/" + city_name.replace(" ", "") + "census_12_2023.csv",
-    index=False
-)
-
-df_vars_23.to_csv(
-    output_path + "downloads/" + city_name.replace(" ", "") + "census_23_2023.csv",
-    index=False
-)
-print("Data Download Complete")
+#Export files to CSV
+df_vars_summ.to_csv(output_path+"downloads/"+city_name.replace(" ", "")+'census_summ_2023.csv')
+df_vars_90.to_csv(output_path+"downloads/"+city_name.replace(" ", "")+'census_90_2023.csv')
+df_vars_00.to_csv(output_path+"downloads/"+city_name.replace(" ", "")+'census_00_2023.csv')
