@@ -24,7 +24,7 @@ FILE_API = os.path.join(BASE_DIR, 'api_key.txt')
 
 with open(FILE_API, 'r') as file:
     key = file.read()
-    print(key)
+
 
 key = key.strip()
 c = census.Census(key)
@@ -273,11 +273,11 @@ df_vars_12=['B25077_001E',
             'B07010_064E',
             'B07010_065E',
             'B07010_066E',
-            'B06011_001E']
+            'B06011_001E',
+            'B19013_001E']
 
 # Run API query
 # --------------------------------------------------------------------------
-# NOTE: Memphis is located in two states so the query looks different
 
 
 var_dict_acs5 = c.acs5.get(df_vars_12, geo = {'for': 'tract:*','in': sql_query}, year=2012)
@@ -334,7 +334,8 @@ df_vars_12 = df_vars_12.rename(columns = {'B25077_001E':'mhval_12',
                                           'B07010_064E':'mov_fa_65000_12',
                                           'B07010_065E':'mov_fa_75000_12',
                                           'B07010_066E':'mov_fa_76000_more_12',
-                                          'B06011_001E':'iinc_12'})
+                                          'B06011_001E':'iinc_12',
+                                          'B19013_001E':'hinc_12'})
 
 ### Decennial Census 2000 Variables
 # ======================================================================
@@ -478,9 +479,8 @@ df_vars_90 = df_vars_90.rename(columns={
 
     # housing totals
     'EXQ001': 'hu_90',        # total housing units
-    'EYP001': 'ohu_90',       # occupied housing units
-    'EZ2001': 'owner_90',     # owner-occupied
-    'EZ2002': 'renter_90',    # renter-occupied
+    'EZ2001': 'ohu_90',     # owner-occupied
+    'EZ2002': 'rhu_90',    # renter-occupied
 
     # education (25+)
     'E33001': 'total_25_col_9th_90',
@@ -494,6 +494,8 @@ df_vars_90 = df_vars_90.rename(columns={
     # income
     'E4U001': 'hinc_90',       # median household income (1989)
 
+    # households
+    'E3V001': 'hh_90',        # total households
     # housing costs
     'EYU001': 'mrent_90',      # median gross rent
     'EZI001': 'mhval_90',      # median home value
@@ -532,9 +534,8 @@ sf3_dict_90 = {
 
     # housing totals
     'EXQ001': 'hu_90',        # total housing units
-    'EYP001': 'ohu_90',       # occupied housing units
-    'EZ2001': 'owner_90',     # owner-occupied
-    'EZ2002': 'renter_90',    # renter-occupied
+    'EZ2001': 'ohu_90',     # owner-occupied
+    'EZ2002': 'rhu_90',    # renter-occupied
 
     # education (25+)
     'E33001': 'total_25_col_9th_90',
