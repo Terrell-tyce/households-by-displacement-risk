@@ -60,15 +60,19 @@ def read_nhgis(path):
 def nhgis_to_fips(df):
     """
     Convert NHGIS GISJOIN to standard 11-digit tract FIPS
-    GISJOIN format: G06 067 020100
+    GISJOIN Example: G0600010400100
+    Resulting FIPS: 06001400100
     """
+    # 1. State FIPS (2 digits): Take indices 1 and 2
+    # 2. County FIPS (3 digits): Skip index 3 (extra zero), take 4, 5, 6
+    # 3. Tract FIPS (6 digits): Skip index 7 (extra zero), take everything after
+    
     df['FIPS'] = (
-        df['GISJOIN']
-        .str.replace('G', '', regex=False)
-        .str.slice(0, 2)   # state
-        + df['GISJOIN'].str.slice(2, 5)   # county
-        + df['GISJOIN'].str.slice(5, 11)  # tract
+        df['GISJOIN'].str.slice(1, 3)   # '06'
+        + df['GISJOIN'].str.slice(4, 7) # '001'
+        + df['GISJOIN'].str.slice(8)    # '400100'
     )
+    
     return df
 
 def audit_renames(rename_dict, meta_dict, title=None):
@@ -358,7 +362,11 @@ df_sf3_00 = df_sf3_00[df_sf3_00['COUNTYA'].isin(FIPS)]
 # -------------------------------
 # Rename variables (MATCHES YOUR SCRIPT)
 # -------------------------------
-df_sf1_00['total_pop_00'] = df_sf1_00['FMR001']+df_sf1_00['FMR002']+df_sf1_00['FMR003']+df_sf1_00['FMR004']+df_sf1_00['FMR005']+df_sf1_00['FMR006']+df_sf1_00['FMR007']							
+# Create a list of the columns to sum
+pop_cols_00 = ['FMR001', 'FMR002', 'FMR003', 'FMR004', 'FMR005', 'FMR006', 'FMR007']
+
+# Convert them to numeric first, then sum across the row (axis=1)
+df_sf1_00['total_pop_00'] = df_sf1_00[pop_cols_00].apply(pd.to_numeric).fillna(0).sum(axis=1)							
 
 df_sf1_00 = df_sf1_00.rename(columns={
     'total_pop_00': 'pop_00',      # Total population
@@ -375,8 +383,10 @@ sfl_dict_00 = {
     'FKM001': 'ohu_00',
     'FKN002': 'rhu_00'
 }
-
-df_sf3_00['total households'] = df_sf3_00['GI6001']+df_sf3_00['GI6002']+df_sf3_00['GI6003']+df_sf3_00['GI6004']+df_sf3_00['GI6005']	
+# Create a list of columns to sum
+hh_cols_00 = ['GI6001', 'GI6002', 'GI6003', 'GI6004', 'GI6005']
+# Convert them to numeric first, then sum across the row (axis=1)
+df_sf3_00['hh_00'] = df_sf3_00[hh_cols_00].apply(pd.to_numeric).fillna(0).sum(axis=1)
 
 sf3_dict_00 = {
     'GKR001': 'total_25_00',
@@ -468,9 +478,10 @@ path_sf3_90 = input_path + "nhgis_ca_sf3_1990_tract.csv"
 
 df_vars_90 = load_nhgis_csv(path_sf3_90)
 df_vars_90 = nhgis_to_fips(df_vars_90)
-
-df_vars_90 = df_vars_90[df_vars_90['COUNTYA'].isin(FIPS)]
-df_vars_90['total_pop_90'] = df_vars_90['E4S001']+df_vars_90['E4S002']+df_vars_90['E4S003']+df_vars_90['E4S004']+df_vars_90['E4S005']		
+# Columns to sum
+pop_cols_90 = ['E4S001', 'E4S002', 'E4S003', 'E4S004', 'E4S005']
+# Convert to numeric then sum rows
+df_vars_90['pop_90'] = df_vars_90[pop_cols_90].apply(pd.to_numeric).fillna(0).sum(axis=1)		
 
 df_vars_90 = df_vars_90.rename(columns={
     # population & race
@@ -603,3 +614,4 @@ from pathlib import Path
 df_vars_summ.to_csv(output_path+"downloads/"+city_name.replace(" ", "")+'census_summ_2023.csv')
 df_vars_90.to_csv(output_path+"downloads/"+city_name.replace(" ", "")+'census_90_2023.csv')
 df_vars_00.to_csv(output_path+"downloads/"+city_name.replace(" ", "")+'census_00_2023.csv')
+
