@@ -23,10 +23,10 @@ import sys
 
 city_name = 'Sacramento'
 
-home = str(Path.home())
-home = home + '/Downloads/households-by-displacement-risk'
-input_path = home + '/data/inputs/'
-output_path = home + '/data/outputs/'
+
+DATA_Dir="I:\Projects\Josh\RHNA\Data\POPEMP_25\emp25_data"
+input_path = DATA_Dir+'/inputs/'
+output_path = DATA_Dir+'/outputs/'
 
 # ==========================================================================
 # Read data
@@ -48,7 +48,7 @@ print(f"Total tracts loaded: {len(data)}")
 # Income Categorization
 # ==========================================================================
 
-data['pop00flag'] = np.where((data['pop_00'] > 500), 1, 0)
+data['pop00flag'] = np.where((data['pop_00'] > 500), 1, 0) #Might not care about the threshold
 print("Number of tracts with insufficient data: ")
 print(data['pop_00'].size-data['pop00flag'].sum())
 # ==========================================================================
@@ -567,10 +567,10 @@ print(f"Missing typology: {df['typology'].isna().sum()}")
 print("\nExporting typology results...")
 
 # Remove geometry for CSV export
-df_export = df.drop(columns=['geometry'])
 
-df_export.to_csv(
-    output_path + '/typologies/' + city_name.replace(" ", "") + '_typology_output.csv'
+df.to_csv(
+    output_path + '/typologies/' + city_name.replace(" ", "") + '_typology_output.csv',
+    columns=['dense',	'SAE'	,'AdvG'	,'ARE',	'BE'	,'SMMI'	,'ARG',	'EOG',	'OD'	,'OD_loss',	'LISD',	'double_counted',	'typology',	'typ_cat','ohu_23','rhu_23','hh_23','GEO_ID','FIPS','county']
 )
 
 print(f"✓ Output saved to: {output_path}/typologies/{city_name.replace(' ', '')}_typology_output.csv")

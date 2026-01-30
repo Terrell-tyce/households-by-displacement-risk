@@ -15,8 +15,10 @@ pd.set_option('display.max_rows', None)
 pd.options.display.float_format = '{:.2f}'.format # avoid scientific notation
 
 home = str(Path.home())
-input_path = home+'/Downloads/households-by-displacement-risk/data/inputs/'
-output_path = home+'/Downloads/households-by-displacement-risk/data/outputs/'
+DATA_Dir="I:\Projects\Josh\RHNA\Data\POPEMP_25\emp25_data"
+input_path = DATA_Dir+'/inputs/'
+output_path = DATA_Dir+'/outputs/'
+
 
 # Get the directory where test.py is located
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -35,7 +37,6 @@ state = '06'
 FIPS = ['067']
 
 
-
 sql_query='state:{} county:*'.format(state)
 
 
@@ -44,18 +45,17 @@ sql_query='state:{} county:*'.format(state)
 
 
 def filter_FIPS(df):
+    """
+    Filters county to FIPS(currently Sacramento)
+    """
     df = df[df['county'].isin(FIPS)]
     return df
+
     
 def load_nhgis_csv(path):
     """Load NHGIS CSV and drop description row"""
     return pd.read_csv(path, skiprows=[1], dtype=str)
 
-def read_nhgis(path):
-    df = pd.read_csv(path)
-    meta = df.iloc[0]          # human-readable labels
-    df = df.iloc[1:].reset_index(drop=True)
-    return df, meta
 
 def nhgis_to_fips(df):
     """
@@ -76,6 +76,10 @@ def nhgis_to_fips(df):
     return df
 
 def audit_renames(rename_dict, meta_dict, title=None):
+    """
+    Takes the dictionary for each rename and prints out the column name as well as meta data
+    as a visual sanity check
+    """
     if title:
         print(f"\n{'='*80}\n{title}\n{'='*80}")
 
@@ -90,6 +94,7 @@ def audit_renames(rename_dict, meta_dict, title=None):
 
 def nhgis_metadata(path):
     """
+    Takes the second row of the nhgis csv with data descriptions and saves that as a dictionary with the column name as column code and 
     Returns dict: {column_code: description}
     """
     meta = pd.read_csv(path, nrows=2, header=None)
@@ -140,9 +145,6 @@ df_vars_23 = df_vars_23 + var_list
 
 # Run API query
 # --------------------------------------------------------------------------
-# NOTE: Memphis is located in two states so the query looks different
-# same for Boston
-
 
 var_dict_acs5 = c.acs5.get(df_vars_23, geo = {'for': 'tract:*','in': sql_query}, year=2023)
 
@@ -358,7 +360,6 @@ df_sf3_00 = nhgis_to_fips(df_sf3_00)
 # filter to Sacramento County
 df_sf1_00 = df_sf1_00[df_sf1_00['COUNTYA'].isin(FIPS)]
 df_sf3_00 = df_sf3_00[df_sf3_00['COUNTYA'].isin(FIPS)]
-
 # -------------------------------
 # Rename variables (MATCHES YOUR SCRIPT)
 # -------------------------------
@@ -371,26 +372,28 @@ df_sf1_00['total_pop_00'] = df_sf1_00[pop_cols_00].apply(pd.to_numeric).fillna(0
 df_sf1_00 = df_sf1_00.rename(columns={
     'total_pop_00': 'pop_00',      # Total population
     'FMR001': 'white_00',    # White alone
-    'FKI001': 'hu_00',
-    'FKM001': 'ohu_00',
-    'FKN002': 'rhu_00'
+    'FKI001': 'hu_00',       # Housing units
+    'FKM001': 'ohu_00',      # Owner occupied housing units
+    'FKN002': 'rhu_00'       # Renter occupied housing units
 })
 
 sfl_dict_00 = {
     'total_pop_00': 'pop_00',      # Total population
     'FMR001': 'white_00',    # White alone
-    'FKI001': 'hu_00',
-    'FKM001': 'ohu_00',
-    'FKN002': 'rhu_00'
+    'FKI001': 'hu_00',       # Housing units
+    'FKM001': 'ohu_00',      # Owner occupied housing units
+    'FKN002': 'rhu_00'       # Renter occupied housing units
 }
-# Create a list of columns to sum
+
+# Create a list of columns for the count of households by language
 hh_cols_00 = ['GI6001', 'GI6002', 'GI6003', 'GI6004', 'GI6005']
-# Convert them to numeric first, then sum across the row (axis=1)
+# Convert them to numeric first, then sum across the row (axis=1) to get total housholds
 df_sf3_00['hh_00'] = df_sf3_00[hh_cols_00].apply(pd.to_numeric).fillna(0).sum(axis=1)
 
 sf3_dict_00 = {
+    #total population under 25
     'GKR001': 'total_25_00',
-
+    # educational attainment under 25
     'GKT013': 'male_25_col_bd_00',
     'GKT014': 'male_25_col_md_00',
     'GKT015': 'male_25_col_psd_00',
@@ -400,10 +403,13 @@ sf3_dict_00 = {
     'GKT030': 'female_25_col_md_00',
     'GKT031': 'female_25_col_psd_00',
     'GKT031': 'female_25_col_phd_00',
-
+    # house value
     'GB7001': 'mhval_00',
+    # median rent
     'GBO001': 'mrent_00',
+    # total houses
     'total households': 'hh_00',
+    # median household  income
     'GMY001': 'hinc_00',
 
     # income bins
@@ -427,8 +433,9 @@ sf3_dict_00 = {
 		
 
 df_sf3_00 = df_sf3_00.rename(columns={
+    #total population under 25
     'GKR001': 'total_25_00',
-
+    # educational attainment under 25
     'GKT013': 'male_25_col_bd_00',
     'GKT014': 'male_25_col_md_00',
     'GKT015': 'male_25_col_psd_00',
@@ -438,10 +445,13 @@ df_sf3_00 = df_sf3_00.rename(columns={
     'GKT030': 'female_25_col_md_00',
     'GKT031': 'female_25_col_psd_00',
     'GKT031': 'female_25_col_phd_00',
-
+    # house value
     'GB7001': 'mhval_00',
+    # median rent
     'GBO001': 'mrent_00',
+    # total houses
     'total households': 'hh_00',
+    # median household  income
     'GMY001': 'hinc_00',
 
     # income bins
@@ -463,12 +473,12 @@ df_sf3_00 = df_sf3_00.rename(columns={
     'GMX016': 'I_201000_00'
 })
 
+# combing sf3 and sf1 data for 2000 into one dataframe
 df_vars_00 = df_sf1_00.merge(
     df_sf3_00.drop(columns=['COUNTYA']),
     on='FIPS',
     how='left'
 )
-
 
 # ======================================================================
 # Decennial Census 1990 — NHGIS
@@ -607,8 +617,6 @@ audit_renames(sf3_dict_00, meta_00_sf3, title="2000 SF3 Variable Renames")
 
 # Merge 2012 & 2023 files they are both tablulated on 2010 census tract and will be until 2025 acs5 yr
 df_vars_summ = df_vars_23.merge(df_vars_12, on ='FIPS')
-
-from pathlib import Path
 
 #Export files to CSV
 df_vars_summ.to_csv(output_path+"downloads/"+city_name.replace(" ", "")+'census_summ_2023.csv')

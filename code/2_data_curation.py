@@ -5,8 +5,6 @@
 # ==========================================================================
 # ==========================================================================
 # ==========================================================================
-# Note: (input needed) in title bars indicates that in order to bring in new city information
-# users must input new code in the section
 
 # ==========================================================================
 # Import Libraries
@@ -27,11 +25,11 @@ pd.set_option('display.max_columns', None)
 pd.set_option('display.max_rows', None)
 pd.options.display.float_format = '{:.2f}'.format # avoid scientific notation
 
-home = str(Path.home())
-input_path = home+'/Downloads/households-by-displacement-risk/data/inputs/'
-output_path = home+'/Downloads/households-by-displacement-risk/data/outputs/'
+DATA_Dir="I:\Projects\Josh\RHNA\Data\POPEMP_25\emp25_data"
+input_path = DATA_Dir+'/inputs/'
+output_path = DATA_Dir+'/outputs/'
 
-# Get the directory where data_curation.py is located and then find key
+# Look for api key in current directory
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 KEY_API = os.path.join(BASE_DIR, 'api_key.txt')
 
@@ -53,10 +51,6 @@ city_name = 'Sacramento'
 # ==========================================================================
 # Read Files
 # ==========================================================================
-# Note: Most of the input files are located on google drive.
-# UDP suggests downloading [Google's Drive File Stream](https://support.google.com/a/answer/7491144?utm_medium=et&utm_source=aboutdrive&utm_content=getstarted&utm_campaign=en_us)
-# app, which doesn't download all Google Drive items to your computer
-# but rather pulls them as necessary. This will save a lot of space but compromises speed.
 
 # Data files
 census_90 = pd.read_csv(output_path+'downloads/'+city_name.replace(" ", "")+'census_90_2023.csv', index_col = 0,dtype={'FIPS':str})
@@ -76,6 +70,7 @@ xwalk_00_10 = pd.read_csv(input_path+'crosswalk_2000_2010.csv',dtype={'trtid00':
 
 state = '06'
 FIPS = ['067']
+city_name = 'Sacramento'
 
 # ==========================================================================
 # Create Crosswalk Functions / Files
@@ -244,7 +239,7 @@ for col in housing_cols:
                 sentintel_tract_list.append(tract)
             
 sentintel_tract_list=set(sentintel_tract_list)
-print(f"unique tracts with invalid zillow values{sentintel_tract_list}")
+print(f"unique tracts with invalid housing values{sentintel_tract_list}")
 # Bring in PUMS data
 # --------------------------------------------------------------------------
 
@@ -267,8 +262,8 @@ pums = pums.dropna(axis = 1)
 # Note: Make sure your city/county is included in these overlay files
 
 ## Zillow data
-zillow = pd.read_csv(input_path+'Zip_Zhvi_AllHomes.csv', encoding = "ISO-8859-1")
-zillow_xwalk = pd.read_csv(input_path+'TRACT_ZIP_032015.csv')
+zillow = pd.read_csv(input_path+'Zip_Zhvi_AllHomes.csv', encoding = "ISO-8859-1",dtype={'RegionName':str})
+zillow_xwalk = pd.read_csv(input_path+'TRACT_ZIP_032015.csv',dtype={'ZIP':str,'TRACT':str})
 
 ## Rail data
 rail = pd.read_csv(input_path+'tod_database_download.csv')
@@ -636,18 +631,9 @@ len(census)
 # Housing Affordability Variables
 # ==========================================================================
 
-def filter_PUMS(df, FIPS):
-    FIPS = [int(x) for x in FIPS]
-    df = df[(df['STATEA'] == int(state))&(df['COUNTYA'].isin(FIPS))].reset_index(drop = True)
-    return df
-
-def filter_FIPS_PUMS(df):
-    df = df[df['COUNTYA'].isin(FIPS)].reset_index(drop = True)
-    return df
-
 pums = nhgis_to_fips(pums)
 pums = pums[pums['FIPS'].str.startswith('06067')].copy()
-pums = filter_FIPS_PUMS(pums)
+
 
 pums = pums.rename(columns = {"ASVAE002":"rhu_23_wcash",
                                 "ASVAE003":"R_100_23",
@@ -837,24 +823,20 @@ def filter_ZILLOW(df, county):
     df['CountyName'] = df['CountyName'].astype(str).str.strip()
     df = df[df['CountyName'] == county].reset_index(drop = True)
     return df
-def filter_ZILLOW_CROSSWALK(df):
-    df.start
-
-## Import Zillow data
-zillow = pd.read_csv(input_path+'Zip_Zhvi_AllHomes.csv', encoding = "ISO-8859-1",dtype={'RegionName':str})
-zillow_xwalk = pd.read_csv(input_path+'TRACT_ZIP_032015.csv',dtype={'ZIP':str,'TRACT':str})
 
 # Calculate Zillow Measures
 # --------------------------------------------------------------------------
 # Strip spaces from RegionName column
 zillow['RegionName'] = zillow['RegionName'].astype(str).str.strip()
 
-# Strip spaces from ZIP column
+# Strip spaces from ZIP AND TRACT columns
 zillow_xwalk['ZIP'] = zillow_xwalk['ZIP'].astype(str).str.strip()
+zillow_xwalk['TRACT'] = zillow_xwalk['TRACT'].astype(str).str.strip()
 
-zillow_xwalk= zillow_xwalk[zillow_xwalk['ZIP'].str.startswith(('95','94'))].copy()
+# filter crosswalk and housing data to Sacramento
+zillow_xwalk= zillow_xwalk[zillow_xwalk['TRACT'].str.startswith('06067')].copy()
+zillow=filter_ZILLOW(zillow,'Sacramento County')
 
-#zillow=filter_ZILLOW(zillow,'Sacramento County')
 ## Compute change over time
 zillow['ch_zillow_12_23'] = zillow['2023-01-31'] - zillow['2012-01-31']*CPI_12_23
 zillow['per_ch_zillow_12_23'] = zillow['ch_zillow_12_23']/zillow['2012-01-31']
@@ -869,12 +851,9 @@ zillow = zillow_xwalk[['TRACT', 'ZIP', 'RES_RATIO']].merge(
     how = "outer"
 )
 
-print(f"Merge Check: Found {zillow['RegionName'].notna().sum()} matches out of {len(zillow)} rows")
+print("Unique Zillow ZIPs before merge:", og_zillow['RegionName'].nunique())
+print("Unique Zillow ZIPs after merge:", zillow['RegionName'].nunique())
 
-# Now find unmatched Zillow records
-removed_rows = og_zillow[~og_zillow['RegionName'].isin(zillow['RegionName'].dropna())]
-
-print(f"\nUnmatched Zillow regions ({len(removed_rows)} total):")
 
 zillow = zillow.rename(columns = {'TRACT':'FIPS'})
 
@@ -1023,7 +1002,6 @@ df['aboverm_pctch_real_hinc_00_23'] = np.where(df['pctch_real_hinc_00_23']>pctch
 df['aboverm_ch_per_col_90_00'] = np.where(df['ch_per_col_90_00']>ch_rm_per_col_90_00, 1, 0)
 df['aboverm_ch_per_col_00_23'] = np.where(df['ch_per_col_00_23']>ch_rm_per_col_00_23, 1, 0)
 df['aboverm_per_units_pre50_23'] = np.where(df['per_units_pre50_23']>rm_per_units_pre50_23, 1, 0)
-df.to_csv('flags.csv')
 # Shapefiles
 # --------------------------------------------------------------------------
 
@@ -1082,11 +1060,9 @@ pub_hous.crs ='EPSG:4269'
 
 ## LIHTC clean
 lihtc = lihtc[lihtc['geometry'].within(city_poly.loc[0, 'geometry'])].reset_index(drop = True)
-lihtc.to_csv("lihtc sample.csv")
 
 ## Public housing
 pub_hous = pub_hous[pub_hous['geometry'].within(city_poly.loc[0, 'geometry'])].reset_index(drop = True)
-pub_hous.to_csv('pub huose sample.csv')
 
 ## Check city_poly CRS
 print(f"\ncity_poly CRS: {city_poly.crs}")
@@ -1102,16 +1078,11 @@ presence_ph_LIHTC = pd.concat([lihtc[['geometry']], pub_hous[['geometry']]])
 ## and create public housing flag
 city_shp['presence_ph_LIHTC'] = city_shp.intersects(presence_ph_LIHTC.union_all())
 
-####
-# Begin Map Plot
-####
-# ax = city_shp.plot(color = 'grey')
-# city_shp.plot(ax = ax, column = 'presence_ph_LIHTC')
-# presence_ph_LIHTC.plot(ax = ax)
-# plt.show()
-####
-# End Map Plot
-####
+
+ax = city_shp.plot(color = 'grey')
+city_shp.plot(ax = ax, column = 'presence_ph_LIHTC')
+presence_ph_LIHTC.plot(ax = ax)
+
 
 # ==========================================================================
 # Merge Census and Zillow Data
@@ -1119,9 +1090,14 @@ city_shp['presence_ph_LIHTC'] = city_shp.intersects(presence_ph_LIHTC.union_all(
 
 #city_shp['GEOID'] = city_shp['GEOID'].astype('int64')
 
-census_zillow = census_zillow.merge(city_shp[['GEOID','geometry','rail',
-	# 'anchor_institution',
-	'presence_ph_LIHTC']], right_on = 'GEOID', left_on = 'FIPS')
+census_zillow = census_zillow.merge(
+    city_shp[['GEOID','geometry','rail','presence_ph_LIHTC']], 
+    right_on = 'GEOID', 
+    left_on = 'FIPS',
+    how = "left",
+    indicator=True
+    )
+
 census_zillow.query("FIPS == 13121011100")
 # ==========================================================================
 # Export Data
