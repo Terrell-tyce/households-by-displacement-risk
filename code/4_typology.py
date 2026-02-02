@@ -565,40 +565,60 @@ print(f"Missing typology: {df['typology'].isna().sum()}")
 # ==========================================================================
 
 print("\nExporting typology results...")
+typology_definitions={
+    'SMMI':'Stable Moderate/Mixed Income',
+    'ARE':'At Risk of Becoming Exclusive',
+    'LISD':'Low Income/Susceptible to Displacement',
+    'AdvG':'Advanced Gentrification',
+    'BE':'Becoming Exclusive',
+    'SAE':'Stable/Advanced Exclusive',
+    'EOG':'Early Ongoing Gentrification',
+    'OD':'Ongoing Displacement',
+    'ARG':'At Risk of Gentrification'
+}
+
+simplified_typology_definitions={
+    'Stable Moderate/Mixed Income':'Stable Moderate/Mixed Income',
+    'At Risk of Becoming Exclusive':'At Risk of or Experiencing Exclusion',
+    'Low Income/Susceptible to Displacement':'Susceptible to or Experiencing Displacement',
+    'Advanced Gentrification':'At Risk of or Experiencing Gentrification',
+    'Becoming Exclusive':'At Risk of or Experiencing Exclusion',
+    'Stable/Advanced Exclusive':'At Risk of or Experiencing Exclusion',
+    'Early Ongoing Gentrification':'At Risk of or Experiencing Gentrification',
+    'Ongoing Displacement':'Susceptible to or Experiencing Displacement',
+    'At Risk of Gentrification':'At Risk of or Experiencing Gentrification'
+}
+# Converts short label to name
+df['typ_name'] = (
+    df['typ_cat']                 
+    .str.strip("[]' ")            # Cleans "['SMMI']" into "SMMI"
+    .replace('', np.nan)          # Turns empty strings into NaN
+    .map(typology_definitions)
+    .fillna('Missing Data')
+)
+
+df['typ_simplified_name'] = (
+    df['typ_name']                 
+    .str.strip("[]' ")            # Cleans "['SMMI']" into "SMMI"
+    .replace('', np.nan)          # Turns empty strings into NaN
+    .map(simplified_typology_definitions)
+    .fillna('Other')
+)
+
+print(df['typology'])
+print(df['typ_name'])
+print(df['typ_simplified_name'])
+
 
 # Remove geometry for CSV export
+df['FIPS'] = df['GEO_ID'].str.split('US').str[1]
+df_export= df.drop(columns=["geometry"])
 
-df.to_csv(
+df_export.to_csv("check typology export.csv")
+df_export.to_csv(
     output_path + '/typologies/' + city_name.replace(" ", "") + '_typology_output.csv',
-    columns=['dense',	'SAE'	,'AdvG'	,'ARE',	'BE'	,'SMMI'	,'ARG',	'EOG',	'OD'	,'OD_loss',	'LISD',	'double_counted',	'typology',	'typ_cat','ohu_23','rhu_23','hh_23','GEO_ID','FIPS','county']
+    columns=['dense','typ_name','typ_simplified_name',	'SAE'	,'AdvG'	,'ARE',	'BE'	,'SMMI'	,'ARG',	'EOG',	'OD'	,'OD_loss',	'LISD',	'double_counted',	'typology',	'typ_cat','ohu_23','rhu_23','hh_23','GEO_ID','FIPS','county']
 )
 
 print(f"✓ Output saved to: {output_path}/typologies/{city_name.replace(' ', '')}_typology_output.csv")
 
-# Find which tracts are missing and why
-missing_tracts = df[df['typology'].isna()]
-
-print("\n" + "="*80)
-print("MISSING TYPOLOGY TRACTS - DIAGNOSTIC")
-print("="*80)
-
-for idx, tract in missing_tracts.iterrows():
-    print(f"\nTract {tract['GEOID']}:")
-    print(f"  pop_00: {tract['pop_00']}")
-    print(f"  pop00flag: {tract['pop00flag']}")
-    
-    # Check which key variables are NaN
-    key_vars = [
-        'real_mhval_23', 'real_mrent_23', 'real_hinc_23',
-        'pctch_real_mhval_00_23', 'pctch_real_mrent_12_23',
-        'vul_gent_23', 'hotmarket_23', 'lostli_23'
-    ]
-    
-    nan_vars = [var for var in key_vars if pd.isna(tract[var])]
-    if nan_vars:
-        print(f"  Missing variables: {nan_vars}")
-    
-    # Check which typology it ALMOST matched
-    print(f"  AdvG: {tract['AdvG']}, ARE: {tract['ARE']}, BE: {tract['BE']}")
-    print(f"  SMMI: {tract['SMMI']}, ARG: {tract['ARG']}, EOG: {tract['EOG']}")
-    print(f"  OD: {tract['OD']}, LISD: {tract['LISD']}, SAE: {tract['SAE']}")
