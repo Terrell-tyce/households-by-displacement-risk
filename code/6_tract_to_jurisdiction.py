@@ -72,7 +72,7 @@ print('Jurisdictions...'); gdf_jurisdictions = gpd.read_file(GDB, layer=FC_JURIS
 print('Census Tracts...'); gdf_tracts        = gpd.read_file(GDB, layer=FC_TRACTS      )
  
 print("Importing typology data")
-df_typol = pd.read_csv(output_path+'/typologies/Sacramento_typology_output.csv',dtype={'FIPS':str})
+df_typol = pd.read_csv(output_path+'/typologies/Sacramento_typology_output.csv',dtype={'FIPS':str,'rhu_23':int,'ohu_23':int})
 df_typol=df_typol.rename(columns={'FIPS':'GEOCODE'})
 
 gdf_overlay = gpd.overlay(gdf_jurisdictions, gdf_tracts, how='intersection', keep_geom_type=False)
@@ -96,6 +96,7 @@ df_jur_summaries = df_jur_summaries.rename(columns={
     'index': 'Typology'
 })
 
+sys.exit()
 df_jur_summaries = df_jur_summaries.drop(columns=['level_1'])
 df_jur_summaries.to_csv(output_path+"/typologies/jurisdiction_typology_summary.csv", index=False)
 
