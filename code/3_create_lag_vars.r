@@ -28,14 +28,14 @@ library(data.table)
 api_key <- trimws(readLines("api_key.txt"))
 census_api_key(api_key)
 DATA_DIR<-"I:/Projects/Josh/RHNA/Data/POPEMP_25/emp25_data"
-input_path = DATA_Dir+'/inputs/'
-output_path = DATA_Dir+'/outputs/'
+input_path = paste0(DATA_DIR,'/inputs/')
+output_path = paste0(DATA_DIR,'/outputs/')
 # ==========================================================================
 # Pull in data
 # ==========================================================================
 
 df <- 
-  read_csv(path_output+"databases/Sacramento_database_2023.csv") %>% 
+  read_csv(paste0(output_path,"databases/Sacramento_database_2023.csv")) %>% 
   dplyr::select(!...1) %>% 
   mutate(city = "Sacramento")
 
@@ -236,7 +236,7 @@ print(paste("Rows in lag:", nrow(lag)))
 print(paste("Missing tr_rent_gap:", sum(is.na(lag$tr_rent_gap))))
 print(paste("Missing dense:", sum(is.na(lag$dense))))
 
-fwrite(lag,output_path+ "lags/lag_sacramento_2023.csv")
+fwrite(lag,paste0(output_path, "lags/lag_sacramento_2023.csv"))
 
 print("✓ Lag variables created successfully!")
 print(paste("Output: ../data/outputs/lags/lag_sacramento_2023.csv"))
