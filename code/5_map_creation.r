@@ -1,6 +1,6 @@
 # ==========================================================================
 # Map data for displacement and vulnerability measures
-# Sacramento County 2023 - Adapted from original script
+# Sacramento County 2024 - Adapted from original script
 # Original Author: Tim Thomas - timthomas@berkeley.edu
 # Adapted for: Sacramento County single-city analysis
 # Note: The US Census API has been unreliable in some occasions. We therefore
@@ -31,20 +31,28 @@ update.packages(ask = FALSE)
 # Cache downloaded tiger files
 options(tigris_use_cache = TRUE)
 census_api_key('4c26aa6ebbaef54a55d3903212eabbb506ade381') #enter your own key here
-
+DATA_DIR<-"I:/Projects/Josh/RHNA/Data/POPEMP_25/emp25_data"
+input_path <- paste0(DATA_DIR,'/inputs/')
+output_path <- paste0(DATA_DIR,'/outputs/')
 # ==========================================================================
 # Data
 # ==========================================================================
-
+setwd("C:/Users/tenoru/Downloads/households-by-displacement-risk/code")
 #
 # Pull in Sacramento typology data
 # --------------------------------------------------------------------------
-
+city_name <- "SACOG"
+if(city_name == "SACOG"){
+  state_fips <- '06'
+  FIPS<- c('067','017','113','115','101','061')
+  state_abrev <- 'CA'
+  states <- c('06')
+}
 data <- 
-  read_csv('../data/outputs/typologies/Sacramento_typology_output.csv') %>% 
-  mutate(city = 'Sacramento') %>%
+  read_csv(paste0(output_path,'typologies/',city_name,'_typology_output.csv')) %>% 
+  mutate(city = city_name) %>%
   left_join(., 
-            read_csv('../data/overlays/oppzones.csv',skip=4) %>% 
+            read_csv(paste0(DATA_DIR,'/overlays/oppzones.csv'),skip=4) %>% 
               select(
                 State = 'Click arrow to filter state\n\nState',
                 GEOID = 'Census Tract Number', 
@@ -59,7 +67,7 @@ data <-
 # --------------------------------------------------------------------------
 # State fips code list: https://www.mcc.co.mercer.pa.us/dps/state_fips_code_listing.htm
 
-states <- c('06')  # California only
+
 
 ###
 # Begin Neighborhood Typology creation (OPTIONAL - can skip for Sacramento)
@@ -106,7 +114,7 @@ states <- c('06')  # California only
 #     output = 'wide',
 #     variables = dem_vars,
 #     cache_table = TRUE,
-#     year = 2023
+#     year = 2024
 #   )
 # fwrite(tr_dem_acs, '~/git/displacement-typologies/data/outputs/downloads/tr_dem_acs_sacramento.csv.gz')
 ### 
@@ -151,10 +159,10 @@ df <-
           typ_cat == "['LISD']" & gent_90_00_urban == 1 ~ 'Advanced Gentrification',
           typ_cat == "['OD']" & gent_90_00 == 1 ~ 'Advanced Gentrification',
           typ_cat == "['OD']" & gent_90_00_urban == 1 ~ 'Advanced Gentrification',
-          typ_cat == "['LISD']" & gent_00_23 == 1 ~ 'Early/Ongoing Gentrification',
-          typ_cat == "['LISD']" & gent_00_23_urban == 1 ~ 'Early/Ongoing Gentrification',
-          typ_cat == "['OD']" & gent_00_23 == 1 ~ 'Early/Ongoing Gentrification',
-          typ_cat == "['OD']" & gent_00_23_urban == 1 ~ 'Early/Ongoing Gentrification',
+          typ_cat == "['LISD']" & gent_00_24 == 1 ~ 'Early/Ongoing Gentrification',
+          typ_cat == "['LISD']" & gent_00_24_urban == 1 ~ 'Early/Ongoing Gentrification',
+          typ_cat == "['OD']" & gent_00_24 == 1 ~ 'Early/Ongoing Gentrification',
+          typ_cat == "['OD']" & gent_00_24_urban == 1 ~ 'Early/Ongoing Gentrification',
           typ_cat == "['AdvG']" ~ 'Advanced Gentrification',
           typ_cat == "['ARE']" ~ 'At Risk of Becoming Exclusive',
           typ_cat == "['ARG']" ~ 'At Risk of Gentrification',
@@ -180,19 +188,19 @@ df <-
             'Unavailable or Unreliable Data'
           )
       ),
-    real_mhval_23 = case_when(real_mhval_23 > 0 ~ real_mhval_23),
-    real_mrent_23 = case_when(real_mrent_23 > 0 ~ real_mrent_23)
+    real_mhval_24 = case_when(real_mhval_24 > 0 ~ real_mhval_24),
+    real_mrent_24 = case_when(real_mrent_24 > 0 ~ real_mrent_24)
   ) %>% 
   group_by(city) %>% 
   mutate(
-    rm_real_mhval_23 = median(real_mhval_23, na.rm = TRUE), 
-    rm_real_mrent_23 = median(real_mrent_23, na.rm = TRUE), 
-    rm_per_nonwhite_23 = median(per_nonwhite_23, na.rm = TRUE), 
-    rm_per_col_23 = median(per_col_23, na.rm = TRUE)
+    rm_real_mhval_24 = median(real_mhval_24, na.rm = TRUE), 
+    rm_real_mrent_24 = median(real_mrent_24, na.rm = TRUE), 
+    rm_per_nonwhite_24 = median(per_nonwhite_24, na.rm = TRUE), 
+    rm_per_col_24 = median(per_col_24, na.rm = TRUE)
   ) %>% 
   group_by(GEOID) %>% 
   mutate(
-    per_ch_li = (all_li_count_23 - all_li_count_00) / all_li_count_00,
+    per_ch_li = (all_li_count_24 - all_li_count_00) / all_li_count_00,
     ci = case_when(
       # Add community input if needed
       TRUE ~ NA_character_
@@ -206,41 +214,41 @@ df <-
         # Market
         '<br><br>',
         '<b><i><u>Market Dynamics</u></i></b><br>',
-        'Tract median home value: ', case_when(!is.na(real_mhval_23) ~ dollar(real_mhval_23), TRUE ~ 'No data'), '<br>',
-        'Tract home value change from 2000 to 2023: ', case_when(is.na(real_mhval_23) ~ 'No data', TRUE ~ percent(pctch_real_mhval_00_23, accuracy = .1)),'<br>',
-        'Regional median home value: ', dollar(rm_real_mhval_23), '<br>',
+        'Tract median home value: ', case_when(!is.na(real_mhval_24) ~ dollar(real_mhval_24), TRUE ~ 'No data'), '<br>',
+        'Tract home value change from 2000 to 2024: ', case_when(is.na(real_mhval_24) ~ 'No data', TRUE ~ percent(pctch_real_mhval_00_24, accuracy = .1)),'<br>',
+        'Regional median home value: ', dollar(rm_real_mhval_24), '<br>',
         '<br>',
-        'Tract median rent: ', case_when(!is.na(real_mrent_23) ~ dollar(real_mrent_23), TRUE ~ 'No data'), '<br>', 
-        'Regional median rent: ', case_when(is.na(real_mrent_23) ~ 'No data', TRUE ~ dollar(rm_real_mrent_23)), '<br>', 
-        'Tract rent change from 2012 to 2023: ', percent(pctch_real_mrent_12_23, accuracy = .1), '<br>',
+        'Tract median rent: ', case_when(!is.na(real_mrent_24) ~ dollar(real_mrent_24), TRUE ~ 'No data'), '<br>', 
+        'Regional median rent: ', case_when(is.na(real_mrent_24) ~ 'No data', TRUE ~ dollar(rm_real_mrent_24)), '<br>', 
+        'Tract rent change from 2012 to 2024: ', percent(pctch_real_mrent_12_24, accuracy = .1), '<br>',
         '<br>',
         'Rent gap (nearby - local): ', dollar(tr_rent_gap), '<br>',
         'Regional median rent gap: ', dollar(rm_rent_gap), '<br>',
         '<br>',
         # demographics
         '<b><i><u>Demographics</u></i></b><br>', 
-        'Tract population: ', comma(pop_23), '<br>', 
-        'Tract household count: ', comma(hh_23), '<br>', 
-        'Percent renter occupied: ', percent(per_rent_23, accuracy = .1), '<br>',
-        'Tract median income: ', dollar(real_hinc_23), '<br>', 
-        'Percent low income hh: ', percent(per_all_li_23, accuracy = .1), '<br>', 
+        'Tract population: ', comma(pop_24), '<br>', 
+        'Tract household count: ', comma(hh_24), '<br>', 
+        'Percent renter occupied: ', percent(per_rent_24, accuracy = .1), '<br>',
+        'Tract median income: ', dollar(real_hinc_24), '<br>', 
+        'Percent low income hh: ', percent(per_all_li_24, accuracy = .1), '<br>', 
         'Percent change in LI: ', percent(per_ch_li, accuracy = .1), '<br>',
         '<br>',
-        'Percent POC: ', percent(per_nonwhite_23, accuracy = .1), '<br>',
-        'Regional median POC: ', percent(rm_per_nonwhite_23, accuracy = .1), '<br>',
-        'Percent college educated: ', percent(per_col_23, accuracy = .1), '<br>',
-        'Regional median educated: ', percent(rm_per_col_23, accuracy = .1), '<br>',
+        'Percent POC: ', percent(per_nonwhite_24, accuracy = .1), '<br>',
+        'Regional median POC: ', percent(rm_per_nonwhite_24, accuracy = .1), '<br>',
+        'Percent college educated: ', percent(per_col_24, accuracy = .1), '<br>',
+        'Regional median educated: ', percent(rm_per_col_24, accuracy = .1), '<br>',
         '<br>',
         # risk factors
         '<b><i><u>Risk Factors</u></i></b><br>', 
-        'Mostly low income: ', case_when(low_pdmt_medhhinc_23 == 1 ~ 'Yes', TRUE ~ 'No'), '<br>',
-        'Mix low income: ', case_when(mix_low_medhhinc_23 == 1 ~ 'Yes', TRUE ~ 'No'), '<br>',
+        'Mostly low income: ', case_when(low_pdmt_medhhinc_24 == 1 ~ 'Yes', TRUE ~ 'No'), '<br>',
+        'Mix low income: ', case_when(mix_low_medhhinc_24 == 1 ~ 'Yes', TRUE ~ 'No'), '<br>',
         'Rent change: ', case_when(dp_PChRent == 1 ~ 'Yes', TRUE ~ 'No'), '<br>',
         'Rent gap: ', case_when(dp_RentGap == 1 ~ 'Yes', TRUE ~ 'No'), '<br>',
-        'Hot Market: ', case_when(hotmarket_23 == 1 ~ 'Yes', TRUE ~ 'No'), '<br>',
-        'Vulnerable to gentrification: ', case_when(vul_gent_23 == 1 ~ 'Yes', TRUE ~ 'No'), '<br>', 
+        'Hot Market: ', case_when(hotmarket_24 == 1 ~ 'Yes', TRUE ~ 'No'), '<br>',
+        'Vulnerable to gentrification: ', case_when(vul_gent_24 == 1 ~ 'Yes', TRUE ~ 'No'), '<br>', 
         'Gentrified from 1990 to 2000: ', case_when(gent_90_00 == 1 | gent_90_00_urban == 1 ~ 'Yes', TRUE ~ 'No'), '<br>', 
-        'Gentrified from 2000 to 2023: ', case_when(gent_00_23 == 1 | gent_00_23_urban == 1 ~ 'Yes', TRUE ~ 'No')
+        'Gentrified from 2000 to 2024: ', case_when(gent_00_24 == 1 | gent_00_24_urban == 1 ~ 'Yes', TRUE ~ 'No')
       )) %>% 
   ungroup() %>% 
   data.frame()
@@ -252,20 +260,20 @@ df <-
      get_acs(
          geography = "tract", 
          variables = "B01003_001", 
-         state = '06',
-         county = '067',  # Sacramento County
+         state = state_fips,
+         county = FIPS,
          geometry = TRUE, 
-         year = 2023
+         year = 2024
      ) %>% 
      select(GEOID) %>% 
      mutate(GEOID = as.numeric(GEOID)) %>% 
      st_transform(st_crs(4326)) 
-     saveRDS(tracts, '../data/outputs/downloads/sacramento_tracts.RDS')
+     saveRDS(tracts, paste0(output_path,'downloads/',city_name,'_tracts.RDS'))
 ###
 # End
 ###
 
-tracts <- readRDS('../data/outputs/downloads/sacramento_tracts.RDS')
+tracts <- readRDS(paste0(output_path,'/downloads/',city_name,'_tracts.RDS'))
 
 # Join the tracts to the dataframe
 df_sf <- 
@@ -309,7 +317,7 @@ df_sf_urban <- df_sf_urban %>% ms_simplify(keep = 0.5)
 red <- 
   rbind(
     geojson_sf('../data/overlays/CASacramento1937.json') %>% 
-      mutate(city = 'Sacramento')
+      mutate(city = city_name)
   ) %>% 
   mutate(
     Grade = 
@@ -342,7 +350,7 @@ red <-
 ### HUD
 
 hud <- 
-  read_csv('../data/overlays/Public_Housing_Buildings.csv') %>% 
+  read_csv(paste0(DATA_DIR,'/overlays/Public_Housing_Buildings.csv')) %>% 
   filter(X != '') %>%
   st_as_sf(
     coords = c("X","Y"), 
@@ -352,7 +360,7 @@ hud <-
 ### Rail data
 rail <- 
   st_join(
-    fread('../data/inputs/tod_database_download.csv') %>% 
+    fread(paste0(input_path,'tod_database_download.csv')) %>% 
       st_as_sf(
         coords = c('Longitude', 'Latitude'), 
         crs = 4269
@@ -366,7 +374,7 @@ rail <-
 ### Hospitals
 hospitals <- 
   st_join(
-    fread('../data/inputs/Hospitals.csv') %>% 
+    fread(paste0(input_path,'Hospitals.csv')) %>% 
       st_as_sf(
         coords = c('X', 'Y'), 
         crs = 4269
@@ -384,7 +392,7 @@ hospitals <-
 ### Universities
 university <- 
   st_join(
-    fread('../data/inputs/university_HD2023.csv') %>% 
+    fread(paste0(input_path,'university_HD2023.csv')) %>% 
       st_as_sf(
         coords = c('LONGITUD', 'LATITUDE'), 
         crs = 4269
@@ -413,12 +421,12 @@ university <-
      st_join(., df_sf_urban %>% select(city), join = st_intersects) %>% 
      mutate(rt = case_when(RTTYP == 'I' ~ 'Interstate', RTTYP == 'U' ~ 'US Highway')) %>% 
      filter(!is.na(city))
- saveRDS(road_map, '../data/outputs/downloads/roads_sacramento.rds')
+ saveRDS(road_map, paste0(output_path,'downloads/roads_',city_name,'.rds'))
 ###
 # End
 ###
 
-road_map <- readRDS('../data/outputs/downloads/roads_sacramento.rds')
+road_map <- readRDS(paste0(output_path,'downloads/roads_',city_name,'.rds'))
 
 ### Opportunity Zones
 # oppzones.csv is already joined to data at the beginning (lines 46-53)
@@ -634,25 +642,25 @@ options <- function(map = .){
 # Sacramento map
 # --------------------------------------------------------------------------
 
-sacramento <- 
-  map_it("Sacramento", 'CA') %>% 
+map_obj <- 
+  map_it(city_name, state_abrev) %>% 
   options() %>% 
   setView(lng = -121.4, lat = 38.6, zoom = 10)
 
 # save map
-htmlwidgets::saveWidget(sacramento, file="../maps/sacramento_udp.html")
+htmlwidgets::saveWidget(map_obj, file=paste0(DATA_DIR,"/maps/",city_name,"_udp.html"))
 
 print("✓ Sacramento map created successfully!")
-print("Output: ~/git/displacement-typologies/maps/sacramento_udp.html")
+print(paste0(DATA_DIR,"/maps/",city_name,"_udp.html"))
 
 #
 # Create file exports (GPKG and CSV)
 # --------------------------------------------------------------------------
 
-sac_sf <- df_sf_urban %>% filter(city == "Sacramento") %>% select(GEOID, Typology)
-st_write(sac_sf, "../data/downloads_for_public/sacramento.gpkg", append=FALSE)
-write_csv(sac_sf %>% st_set_geometry(NULL), "../data/downloads_for_public/sacramento.csv")
+sac_sf <- df_sf_urban %>% filter(city == city_name) %>% select(GEOID, Typology)
+#st_write(sac_sf, paste0(DATA_DIR,'/downloads_for_public/',city_name,".gpkg"), append=FALSE)
+write_csv(sac_sf %>% st_set_geometry(NULL), paste0(DATA_DIR,"/downloads_for_public/",city_name,".csv"))
 
 print("✓ Sacramento data exports created:")
-print("  - ../data/downloads_for_public/sacramento.gpkg")
-print("  - ../data/downloads_for_public/sacramento.csv")
+print(paste0(DATA_DIR,"/downloads_for_public/",city_name,".gpkg"))
+print(paste0(DATA_DIR,"/downloads_for_public/",city_name,".csv"))

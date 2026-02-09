@@ -3,10 +3,10 @@
 
 # ==========================================================================
 # Displacement Typology Classification
-# Sacramento County, 2023 ACS Data
+# 2024 ACS Data
 # ==========================================================================
 # Adapted from: https://github.com/urban-displacement/displacement-typologies
-# Updated for Sacramento 2023 ACS data and R lag variables
+# Updated for 2024 ACS data and R lag variables
 # ==========================================================================
 
 import pandas as pd
@@ -19,11 +19,7 @@ import sys
 
 # ==========================================================================
 # Setup paths
-# ==========================================================================
-
-city_name = 'Sacramento'
-
-
+# =========================================================================
 DATA_Dir="I:\Projects\Josh\RHNA\Data\POPEMP_25\emp25_data"
 input_path = DATA_Dir+'/inputs/'
 output_path = DATA_Dir+'/outputs/'
@@ -31,10 +27,12 @@ output_path = DATA_Dir+'/outputs/'
 # ==========================================================================
 # Read data
 # ==========================================================================
-lag = pd.read_csv(output_path + 'lags/lag_sacramento_2023.csv')
+# Enter city name to read in the correct lag variables and typology input data
+city_name = 'SACOG'
+lag = pd.read_csv(output_path + 'lags/lag_' + city_name.replace(" ", "") + '_2024.csv')
 
 typology_input = pd.read_csv(
-    output_path + '/databases/' + city_name.replace(" ", "") + '_database_2023.csv',
+    output_path + '/databases/' + city_name.replace(" ", "") + '_database_2024.csv',
     index_col=0
 )
 
@@ -76,13 +74,13 @@ data['vul_gent_00'] = np.where(
     1, 0
 )
 
-### 2023
-data['vul_gent_23'] = np.where(
-    ((data['aboverm_real_mrent_23'] == 0) | (data['aboverm_real_mhval_23'] == 0)) &
-    ((data['aboverm_per_all_li_23'] +
-      data['aboverm_per_nonwhite_23'] +
-      data['aboverm_per_rent_23'] +
-      (1 - data['aboverm_per_col_23'])) > 2),
+### 2024
+data['vul_gent_24'] = np.where(
+    ((data['aboverm_real_mrent_24'] == 0) | (data['aboverm_real_mhval_24'] == 0)) &
+    ((data['aboverm_per_all_li_24'] +
+      data['aboverm_per_nonwhite_24'] +
+      data['aboverm_per_rent_24'] +
+      (1 - data['aboverm_per_col_24'])) > 2),
     1, 0
 )
 
@@ -113,15 +111,15 @@ data['hotmarket_00'] = np.where(
     np.nan, data['hotmarket_00']
 )
 
-data['hotmarket_23'] = np.where(
-    (data['aboverm_pctch_real_mhval_00_23'] == 1) |
-    (data['aboverm_pctch_real_mrent_12_23'] == 1),
+data['hotmarket_24'] = np.where(
+    (data['aboverm_pctch_real_mhval_00_24'] == 1) |
+    (data['aboverm_pctch_real_mrent_12_24'] == 1),
     1, 0
 )
-data['hotmarket_23'] = np.where(
-    (data['aboverm_pctch_real_mhval_00_23'].isna()) |
-    (data['aboverm_pctch_real_mrent_12_23'].isna()),
-    np.nan, data['hotmarket_23']
+data['hotmarket_24'] = np.where(
+    (data['aboverm_pctch_real_mhval_00_24'].isna()) |
+    (data['aboverm_pctch_real_mrent_12_24'].isna()),
+    np.nan, data['hotmarket_24']
 )
 
 # ==========================================================================
@@ -147,21 +145,21 @@ data['gent_90_00_urban'] = np.where(
     1, 0
 )
 
-### 2000-2023
-data['gent_00_23'] = np.where(
+### 2000-2024
+data['gent_00_24'] = np.where(
     (data['vul_gent_00'] == 1) &
-    (data['aboverm_ch_per_col_00_23'] == 1) &
-    (data['aboverm_pctch_real_hinc_00_23'] == 1) &
-    (data['lostli_23'] == 1) &
-    (data['hotmarket_23'] == 1),
+    (data['aboverm_ch_per_col_00_24'] == 1) &
+    (data['aboverm_pctch_real_hinc_00_24'] == 1) &
+    (data['lostli_24'] == 1) &
+    (data['hotmarket_24'] == 1),
     1, 0
 )
 
-data['gent_00_23_urban'] = np.where(
+data['gent_00_24_urban'] = np.where(
     (data['vul_gent_00'] == 1) &
-    (data['aboverm_ch_per_col_00_23'] == 1) &
-    (data['aboverm_pctch_real_hinc_00_23'] == 1) &
-    (data['hotmarket_23'] == 1),
+    (data['aboverm_ch_per_col_00_24'] == 1) &
+    (data['aboverm_pctch_real_hinc_00_24'] == 1) &
+    (data['hotmarket_24'] == 1),
     1, 0
 )
 
@@ -200,7 +198,7 @@ df['SAE'] = 0
 df['SAE'] = np.where(
     (df['pop00flag'] == 1) &
     (df['high_pdmt_medhhinc_00'] == 1) &
-    (df['high_pdmt_medhhinc_23'] == 1) &
+    (df['high_pdmt_medhhinc_24'] == 1) &
     ((df['lmh_flag_encoded'] == 3) | (df['lmh_flag_encoded'] == 6)) &
     ((df['change_flag_encoded'] == 1) | (df['change_flag_encoded'] == 2) |
      (df['change_flag_encoded'] == 3)),
@@ -210,7 +208,7 @@ df['SAE'] = np.where(
 df['SAE'] = np.where(
     (df['pop00flag'].isna()) |
     (df['high_pdmt_medhhinc_00'].isna()) |
-    (df['high_pdmt_medhhinc_23'].isna()) |
+    (df['high_pdmt_medhhinc_24'].isna()) |
     (df['lmh_flag_encoded'].isna()) |
     (df['change_flag_encoded'].isna()),
     np.nan, df['SAE']
@@ -236,36 +234,36 @@ print("Classifying: Advanced Gentrification...")
 df['AdvG'] = 0
 df['AdvG'] = np.where(
     (df['pop00flag'] == 1) &
-    ((df['mod_pdmt_medhhinc_23'] == 1) | (df['mix_mod_medhhinc_23'] == 1) |
-     (df['mix_high_medhhinc_23'] == 1) | (df['high_pdmt_medhhinc_23'] == 1)) &
+    ((df['mod_pdmt_medhhinc_24'] == 1) | (df['mix_mod_medhhinc_24'] == 1) |
+     (df['mix_high_medhhinc_24'] == 1) | (df['high_pdmt_medhhinc_24'] == 1)) &
     ((df['lmh_flag_encoded'] == 2) | (df['lmh_flag_encoded'] == 3) |
      (df['lmh_flag_encoded'] == 5) | (df['lmh_flag_encoded'] == 6)) &
     ((df['change_flag_encoded'] == 1) | (df['change_flag_encoded'] == 2) |
      (df['change_flag_encoded'] == 3)) &
-    ((df['pctch_real_mhval_00_23'] > 0) | (df['pctch_real_mrent_12_23'] > 0)) &
+    ((df['pctch_real_mhval_00_24'] > 0) | (df['pctch_real_mrent_12_24'] > 0)) &
     (
         ((df['dense'] == 0) & (df['gent_90_00'] == 1)) |
-        ((df['dense'] == 0) & (df['gent_00_23'] == 1)) |
+        ((df['dense'] == 0) & (df['gent_00_24'] == 1)) |
         ((df['dense'] == 1) & (df['gent_90_00_urban'] == 1)) |
-        ((df['dense'] == 1) & (df['gent_00_23_urban'] == 1))
+        ((df['dense'] == 1) & (df['gent_00_24_urban'] == 1))
     ),
     1, 0
 )
 
 df['AdvG'] = np.where(
     (df['pop00flag'].isna()) |
-    (df['mod_pdmt_medhhinc_23'].isna()) |
-    (df['mix_mod_medhhinc_23'].isna()) |
-    (df['mix_high_medhhinc_23'].isna()) |
-    (df['high_pdmt_medhhinc_23'].isna()) |
+    (df['mod_pdmt_medhhinc_24'].isna()) |
+    (df['mix_mod_medhhinc_24'].isna()) |
+    (df['mix_high_medhhinc_24'].isna()) |
+    (df['high_pdmt_medhhinc_24'].isna()) |
     (df['lmh_flag_encoded'].isna()) |
     (df['change_flag_encoded'].isna()) |
     (df['gent_90_00'].isna()) |
     (df['gent_90_00_urban'].isna()) |
-    (df['gent_00_23_urban'].isna()) |
-    (df['pctch_real_mhval_00_23'].isna()) |
-    (df['pctch_real_mrent_12_23'].isna()) |
-    (df['gent_00_23'].isna()),
+    (df['gent_00_24_urban'].isna()) |
+    (df['pctch_real_mhval_00_24'].isna()) |
+    (df['pctch_real_mrent_12_24'].isna()) |
+    (df['gent_00_24'].isna()),
     np.nan, df['AdvG']
 )
 
@@ -282,8 +280,8 @@ print("Classifying: At Risk of Becoming Exclusive...")
 df['ARE'] = 0
 df['ARE'] = np.where(
     (df['pop00flag'] == 1) &
-    ((df['mod_pdmt_medhhinc_23'] == 1) | (df['mix_mod_medhhinc_23'] == 1) |
-     (df['mix_high_medhhinc_23'] == 1) | (df['high_pdmt_medhhinc_23'] == 1)) &
+    ((df['mod_pdmt_medhhinc_24'] == 1) | (df['mix_mod_medhhinc_24'] == 1) |
+     (df['mix_high_medhhinc_24'] == 1) | (df['high_pdmt_medhhinc_24'] == 1)) &
     ((df['lmh_flag_encoded'] == 2) | (df['lmh_flag_encoded'] == 3) |
      (df['lmh_flag_encoded'] == 5) | (df['lmh_flag_encoded'] == 6)) &
     ((df['change_flag_encoded'] == 1) | (df['change_flag_encoded'] == 2)),
@@ -292,10 +290,10 @@ df['ARE'] = np.where(
 
 df['ARE'] = np.where(
     (df['pop00flag'].isna()) |
-    (df['mod_pdmt_medhhinc_23'].isna()) |
-    (df['mix_mod_medhhinc_23'].isna()) |
-    (df['mix_high_medhhinc_23'].isna()) |
-    (df['high_pdmt_medhhinc_23'].isna()) |
+    (df['mod_pdmt_medhhinc_24'].isna()) |
+    (df['mix_mod_medhhinc_24'].isna()) |
+    (df['mix_high_medhhinc_24'].isna()) |
+    (df['high_pdmt_medhhinc_24'].isna()) |
     (df['lmh_flag_encoded'].isna()) |
     (df['change_flag_encoded'].isna()),
     np.nan, df['ARE']
@@ -315,29 +313,29 @@ print("Classifying: Becoming Exclusive...")
 df['BE'] = 0
 df['BE'] = np.where(
     (df['pop00flag'] == 1) &
-    ((df['mod_pdmt_medhhinc_23'] == 1) | (df['mix_mod_medhhinc_23'] == 1) |
-     (df['mix_high_medhhinc_23'] == 1) | (df['high_pdmt_medhhinc_23'] == 1)) &
+    ((df['mod_pdmt_medhhinc_24'] == 1) | (df['mix_mod_medhhinc_24'] == 1) |
+     (df['mix_high_medhhinc_24'] == 1) | (df['high_pdmt_medhhinc_24'] == 1)) &
     ((df['lmh_flag_encoded'] == 2) | (df['lmh_flag_encoded'] == 3) |
      (df['lmh_flag_encoded'] == 5) | (df['lmh_flag_encoded'] == 6)) &
     (df['change_flag_encoded'] == 3) &
-    (df['lostli_23'] == 1) &
-    (df['per_limove_23'] < df['per_limove_12']) &
-    (df['real_hinc_23'] > df['real_hinc_00']),
+    (df['lostli_24'] == 1) &
+    (df['per_limove_24'] < df['per_limove_12']) &
+    (df['real_hinc_24'] > df['real_hinc_00']),
     1, 0
 )
 
 df['BE'] = np.where(
     (df['pop00flag'].isna()) |
-    (df['mod_pdmt_medhhinc_23'].isna()) |
-    (df['mix_mod_medhhinc_23'].isna()) |
-    (df['mix_high_medhhinc_23'].isna()) |
-    (df['high_pdmt_medhhinc_23'].isna()) |
+    (df['mod_pdmt_medhhinc_24'].isna()) |
+    (df['mix_mod_medhhinc_24'].isna()) |
+    (df['mix_high_medhhinc_24'].isna()) |
+    (df['high_pdmt_medhhinc_24'].isna()) |
     (df['lmh_flag_encoded'].isna()) |
     (df['change_flag_encoded'].isna()) |
-    (df['lostli_23'].isna()) |
-    (df['per_limove_23'].isna()) |
+    (df['lostli_24'].isna()) |
+    (df['per_limove_24'].isna()) |
     (df['per_limove_12'].isna()) |
-    (df['real_hinc_23'].isna()) |
+    (df['real_hinc_24'].isna()) |
     (df['real_hinc_00'].isna()),
     np.nan, df['BE']
 )
@@ -356,18 +354,18 @@ print("Classifying: Stable Moderate/Mixed Income...")
 df['SMMI'] = 0
 df['SMMI'] = np.where(
     (df['pop00flag'] == 1) &
-    ((df['mod_pdmt_medhhinc_23'] == 1) | (df['mix_mod_medhhinc_23'] == 1) |
-     (df['mix_high_medhhinc_23'] == 1) | (df['high_pdmt_medhhinc_23'] == 1)) &
+    ((df['mod_pdmt_medhhinc_24'] == 1) | (df['mix_mod_medhhinc_24'] == 1) |
+     (df['mix_high_medhhinc_24'] == 1) | (df['high_pdmt_medhhinc_24'] == 1)) &
     (df['ARE'] == 0) & (df['BE'] == 0) & (df['SAE'] == 0) & (df['AdvG'] == 0),
     1, 0
 )
 
 df['SMMI'] = np.where(
     (df['pop00flag'].isna()) |
-    (df['mod_pdmt_medhhinc_23'].isna()) |
-    (df['mix_mod_medhhinc_23'].isna()) |
-    (df['mix_high_medhhinc_23'].isna()) |
-    (df['high_pdmt_medhhinc_23'].isna()),
+    (df['mod_pdmt_medhhinc_24'].isna()) |
+    (df['mix_mod_medhhinc_24'].isna()) |
+    (df['mix_high_medhhinc_24'].isna()) |
+    (df['high_pdmt_medhhinc_24'].isna()),
     np.nan, df['SMMI']
 )
 
@@ -382,21 +380,21 @@ print("Classifying: At Risk of Gentrification...")
 df['ARG'] = 0
 df['ARG'] = np.where(
     (df['pop00flag'] == 1) &
-    ((df['low_pdmt_medhhinc_23'] == 1) | (df['mix_low_medhhinc_23'] == 1)) &
+    ((df['low_pdmt_medhhinc_24'] == 1) | (df['mix_low_medhhinc_24'] == 1)) &
     ((df['lmh_flag_encoded'] == 1) | (df['lmh_flag_encoded'] == 4)) &
     ((df['change_flag_encoded'] == 1) | (df['ab_90percentile_ch'] == 1) |
      (df['rent_90percentile_ch'] == 1)) &
     (df['gent_90_00'] == 0) &
     ((df['dp_PChRent'] == 1) | (df['dp_RentGap'] == 1)) &
-    (df['vul_gent_23'] == 1) &
-    (df['gent_00_23'] == 0),
+    (df['vul_gent_24'] == 1) &
+    (df['gent_00_24'] == 0),
     1, 0
 )
 
 df['ARG'] = np.where(
     (df['pop00flag'].isna()) |
-    (df['low_pdmt_medhhinc_23'].isna()) |
-    (df['mix_low_medhhinc_23'].isna()) |
+    (df['low_pdmt_medhhinc_24'].isna()) |
+    (df['mix_low_medhhinc_24'].isna()) |
     (df['lmh_flag_encoded'].isna()) |
     (df['change_flag_encoded'].isna()) |
     (df['rent_90percentile_ch'].isna()) |
@@ -404,7 +402,7 @@ df['ARG'] = np.where(
     (df['vul_gent_00'].isna()) |
     (df['dp_PChRent'].isna()) |
     (df['dp_RentGap'].isna()) |
-    (df['gent_00_23'].isna()),
+    (df['gent_00_24'].isna()),
     np.nan, df['ARG']
 )
 
@@ -419,29 +417,29 @@ print("Classifying: Early/Ongoing Gentrification...")
 df['EOG'] = 0
 df['EOG'] = np.where(
     (df['pop00flag'] == 1) &
-    ((df['low_pdmt_medhhinc_23'] == 1) | (df['mix_low_medhhinc_23'] == 1)) &
+    ((df['low_pdmt_medhhinc_24'] == 1) | (df['mix_low_medhhinc_24'] == 1)) &
     ((df['lmh_flag_encoded'] == 2) | (df['lmh_flag_encoded'] == 5)) &
     ((df['change_flag_encoded'] == 2) | (df['change_flag_encoded'] == 3) |
      (df['hv_abrm_ch'] == 1) | (df['rent_abrm_ch'] == 1)) &
     (
         ((df['dense'] == 0) & (df['gent_90_00'] == 1)) |
-        ((df['dense'] == 0) & (df['gent_00_23'] == 1)) |
+        ((df['dense'] == 0) & (df['gent_00_24'] == 1)) |
         ((df['dense'] == 1) & (df['gent_90_00_urban'] == 1)) |
-        ((df['dense'] == 1) & (df['gent_00_23_urban'] == 1))
+        ((df['dense'] == 1) & (df['gent_00_24_urban'] == 1))
     ),
     1, 0
 )
 
 df['EOG'] = np.where(
     (df['pop00flag'].isna()) |
-    (df['low_pdmt_medhhinc_23'].isna()) |
-    (df['mix_low_medhhinc_23'].isna()) |
+    (df['low_pdmt_medhhinc_24'].isna()) |
+    (df['mix_low_medhhinc_24'].isna()) |
     (df['lmh_flag_encoded'].isna()) |
     (df['change_flag_encoded'].isna()) |
     (df['gent_90_00'].isna()) |
-    (df['gent_00_23'].isna()) |
+    (df['gent_00_24'].isna()) |
     (df['gent_90_00_urban'].isna()) |
-    (df['gent_00_23_urban'].isna()) |
+    (df['gent_00_24_urban'].isna()) |
     (df['ab_50pct_ch'].isna()) |
     (df['hv_abrm_ch'].isna()) |
     (df['rent_abrm_ch'].isna()) |
@@ -460,16 +458,16 @@ print("Classifying: Ongoing Displacement...")
 df['OD'] = 0
 df['OD'] = np.where(
     (df['pop00flag'] == 1) &
-    ((df['low_pdmt_medhhinc_23'] == 1) | (df['mix_low_medhhinc_23'] == 1)) &
-    (df['lostli_23'] == 1),
+    ((df['low_pdmt_medhhinc_24'] == 1) | (df['mix_low_medhhinc_24'] == 1)) &
+    (df['lostli_24'] == 1),
     1, 0
 )
 
 df['OD_loss'] = np.where(
     (df['pop00flag'].isna()) |
-    (df['low_pdmt_medhhinc_23'].isna()) |
-    (df['mix_low_medhhinc_23'].isna()) |
-    (df['lostli_23'].isna()),
+    (df['low_pdmt_medhhinc_24'].isna()) |
+    (df['mix_low_medhhinc_24'].isna()) |
+    (df['lostli_24'].isna()),
     np.nan, df['OD']
 )
 
@@ -487,7 +485,7 @@ print("Classifying: Low-Income/Susceptible to Displacement...")
 df['LISD'] = 0
 df['LISD'] = np.where(
     (df['pop00flag'] == 1) &
-    ((df['low_pdmt_medhhinc_23'] == 1) | (df['mix_low_medhhinc_23'] == 1)) &
+    ((df['low_pdmt_medhhinc_24'] == 1) | (df['mix_low_medhhinc_24'] == 1)) &
     (df['OD'] != 1) & (df['ARG'] != 1) & (df['EOG'] != 1),
     1, 0
 )
@@ -616,8 +614,7 @@ df_export= df.drop(columns=["geometry"])
 
 df_export.to_csv("check typology export.csv")
 df_export.to_csv(
-    output_path + '/typologies/' + city_name.replace(" ", "") + '_typology_output.csv',
-    columns=['dense','typ_name','typ_simplified_name',	'SAE'	,'AdvG'	,'ARE',	'BE'	,'SMMI'	,'ARG',	'EOG',	'OD'	,'OD_loss',	'LISD',	'double_counted',	'typology',	'typ_cat','ohu_23','rhu_23','hh_23','GEO_ID','FIPS','county']
+    output_path + '/typologies/' + city_name.replace(" ", "") + '_typology_output.csv'
 )
 
 print(f"✓ Output saved to: {output_path}/typologies/{city_name.replace(' ', '')}_typology_output.csv")

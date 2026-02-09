@@ -9,6 +9,7 @@ from pyproj import Proj
 import matplotlib.pyplot as plt
 import os
 from pathlib import Path
+import requests
 
 pd.set_option('display.max_columns', None)
 pd.set_option('display.max_rows', None)
@@ -31,19 +32,20 @@ with open(FILE_API, 'r') as file:
 key = key.strip()
 c = census.Census(key)
 
+# ENTER CITY NAME HERE (options: Sacramento, San Francisco, San Jose, SACOG)
+city_name = 'SACOG'
 
-city_name = 'Sacramento'
-state = '06'
-FIPS = ['067']
-
+if city_name == 'Sacramento':
+    state = '06'
+    FIPS = ['067'] # Sacramento
+elif city_name == 'SACOG':
+    state = '06'
+    FIPS = ['067','017','113','115','101','061'] # Sacramento, El Dorado, Placer, Yolo, Sutter, Yuba
 
 sql_query='state:{} county:*'.format(state)
 
-
-# Create Filter Function
+# Functions
 # --------------------------------------------------------------------------
-
-
 def filter_FIPS(df):
     """
     Filters county to FIPS(currently Sacramento)
@@ -51,6 +53,12 @@ def filter_FIPS(df):
     df = df[df['county'].isin(FIPS)]
     return df
 
+def filter_FIPS_census(df):
+    """
+    Filters county to FIPS(currently Sacramento)
+    """
+    df = df[df['COUNTYA'].isin(FIPS)]
+    return df
     
 def load_nhgis_csv(path):
     """Load NHGIS CSV and drop description row"""
@@ -104,10 +112,10 @@ def nhgis_metadata(path):
 # Download Raw Data
 # ==========================================================================
 
-# Download ACS 2023 5-Year Estimates
+# Download ACS 2024 5-Year Estimates
 # --------------------------------------------------------------------------
 
-df_vars_23=['B03002_001E',
+df_vars_24=['B03002_001E',
             'B03002_003E',
             'B19001_001E',
             'B19013_001E',
@@ -133,104 +141,104 @@ var_str = 'B19001'
 var_list = []
 for i in range (1, 18):
     var_list.append(var_str+'_'+str(i).zfill(3)+'E')
-df_vars_23 = df_vars_23 + var_list
+df_vars_24 = df_vars_24 + var_list
 
 # Migration - see notes
 var_str = 'B07010'
 var_list = []
 for i in list(range(25,34))+list(range(36, 45))+list(range(47, 56))+list(range(58, 67)):
     var_list.append(var_str+'_'+str(i).zfill(3)+'E')
-df_vars_23 = df_vars_23 + var_list
+df_vars_24 = df_vars_24 + var_list
 
 
 # Run API query
 # --------------------------------------------------------------------------
+geo_query = {'for': 'tract:*', 'in': sql_query}
 
-var_dict_acs5 = c.acs5.get(df_vars_23, geo = {'for': 'tract:*','in': sql_query}, year=2023)
+var_dict_acs5 = c.acs5.get(df_vars_24, geo=geo_query, year=2024)
+acs_year_used = 2024
 
 # Convert and Rename Variables
 # --------------------------------------------------------------------------
 
-### Converts variables into dataframe and filters only FIPS of interest
+df_vars_24 = pd.DataFrame.from_dict(var_dict_acs5)
+df_vars_24['FIPS']=df_vars_24['state']+df_vars_24['county']+df_vars_24['tract']
+df_vars_24 = filter_FIPS(df_vars_24)
 
-df_vars_23 = pd.DataFrame.from_dict(var_dict_acs5)
-df_vars_23['FIPS']=df_vars_23['state']+df_vars_23['county']+df_vars_23['tract']
-df_vars_23 = filter_FIPS(df_vars_23)
 
-### Renames variables
+df_vars_24 = df_vars_24.rename(columns = {'B03002_001E':'pop_24',
+                                            'B03002_003E':'white_24',
+                                            'B19001_001E':'hh_24',
+                                            'B19013_001E':'hinc_24',
+                                            'B25077_001E':'mhval_24',
+                                            'B25077_001M':'mhval_24_se',
+                                            'B25064_001E':'mrent_24',
+                                            'B25064_001M':'mrent_24_se',
+                                            'B25003_002E':'ohu_24',
+                                            'B25003_003E':'rhu_24',
+                                            'B25105_001E':'mmhcosts_24',
+                                            'B15003_001E':'total_25_24',
+                                            'B15003_022E':'total_25_col_bd_24',
+                                            'B15003_023E':'total_25_col_md_24',
+                                            'B15003_024E':'total_25_col_pd_24',
+                                            'B15003_025E':'total_25_col_phd_24',
+                                            'B25034_001E':'tot_units_built_24',
+                                            'B25034_010E':'units_40_49_built_24',
+                                            'B25034_011E':'units_39_early_built_24',
+                                            'B07010_025E':'mov_wc_w_income_24',
+                                            'B07010_026E':'mov_wc_9000_24',
+                                            'B07010_027E':'mov_wc_15000_24',
+                                            'B07010_028E':'mov_wc_25000_24',
+                                            'B07010_029E':'mov_wc_35000_24',
+                                            'B07010_030E':'mov_wc_50000_24',
+                                            'B07010_031E':'mov_wc_65000_24',
+                                            'B07010_032E':'mov_wc_75000_24',
+                                            'B07010_033E':'mov_wc_76000_more_24',
+                                            'B07010_036E':'mov_oc_w_income_24',
+                                            'B07010_037E':'mov_oc_9000_24',
+                                            'B07010_038E':'mov_oc_15000_24',
+                                            'B07010_039E':'mov_oc_25000_24',
+                                            'B07010_040E':'mov_oc_35000_24',
+                                            'B07010_041E':'mov_oc_50000_24',
+                                            'B07010_042E':'mov_oc_65000_24',
+                                            'B07010_043E':'mov_oc_75000_24',
+                                            'B07010_044E':'mov_oc_76000_more_24',
+                                            'B07010_047E':'mov_os_w_income_24',
+                                            'B07010_048E':'mov_os_9000_24',
+                                            'B07010_049E':'mov_os_15000_24',
+                                            'B07010_050E':'mov_os_25000_24',
+                                            'B07010_051E':'mov_os_35000_24',
+                                            'B07010_052E':'mov_os_50000_24',
+                                            'B07010_053E':'mov_os_65000_24',
+                                            'B07010_054E':'mov_os_75000_24',
+                                            'B07010_055E':'mov_os_76000_more_24',
+                                            'B07010_058E':'mov_fa_w_income_24',
+                                            'B07010_059E':'mov_fa_9000_24',
+                                            'B07010_060E':'mov_fa_15000_24',
+                                            'B07010_061E':'mov_fa_25000_24',
+                                            'B07010_062E':'mov_fa_35000_24',
+                                            'B07010_063E':'mov_fa_50000_24',
+                                            'B07010_064E':'mov_fa_65000_24',
+                                            'B07010_065E':'mov_fa_75000_24',
+                                            'B07010_066E':'mov_fa_76000_more_24',
+                                            'B06011_001E':'iinc_24',
+                                            'B19001_002E':'I_10000_24',
+                                            'B19001_003E':'I_15000_24',
+                                            'B19001_004E':'I_20000_24',
+                                            'B19001_005E':'I_25000_24',
+                                            'B19001_006E':'I_30000_24',
+                                            'B19001_007E':'I_35000_24',
+                                            'B19001_008E':'I_40000_24',
+                                            'B19001_009E':'I_45000_24',
+                                            'B19001_010E':'I_50000_24',
+                                            'B19001_011E':'I_60000_24',
+                                            'B19001_012E':'I_75000_24',
+                                            'B19001_013E':'I_100000_24',
+                                            'B19001_014E':'I_125000_24',
+                                            'B19001_015E':'I_150000_24',
+                                            'B19001_016E':'I_200000_24',
+                                            'B19001_017E':'I_201000_24'})
 
-df_vars_23 = df_vars_23.rename(columns = {'B03002_001E':'pop_23',
-                                          'B03002_003E':'white_23',
-                                          'B19001_001E':'hh_23',
-                                          'B19013_001E':'hinc_23',
-                                          'B25077_001E':'mhval_23',
-                                          'B25077_001M':'mhval_23_se',
-                                          'B25064_001E':'mrent_23',
-                                          'B25064_001M':'mrent_23_se',
-                                          'B25003_002E':'ohu_23',
-                                          'B25003_003E':'rhu_23',
-                                          'B25105_001E':'mmhcosts_23',
-                                          'B15003_001E':'total_25_23',
-                                          'B15003_022E':'total_25_col_bd_23',
-                                          'B15003_023E':'total_25_col_md_23',
-                                          'B15003_024E':'total_25_col_pd_23',
-                                          'B15003_025E':'total_25_col_phd_23',
-                                          'B25034_001E':'tot_units_built_23',
-                                          'B25034_010E':'units_40_49_built_23',
-                                          'B25034_011E':'units_39_early_built_23',
-                                          'B07010_025E':'mov_wc_w_income_23',
-                                          'B07010_026E':'mov_wc_9000_23',
-                                          'B07010_027E':'mov_wc_15000_23',
-                                          'B07010_028E':'mov_wc_25000_23',
-                                          'B07010_029E':'mov_wc_35000_23',
-                                          'B07010_030E':'mov_wc_50000_23',
-                                          'B07010_031E':'mov_wc_65000_23',
-                                          'B07010_032E':'mov_wc_75000_23',
-                                          'B07010_033E':'mov_wc_76000_more_23',
-                                          'B07010_036E':'mov_oc_w_income_23',
-                                          'B07010_037E':'mov_oc_9000_23',
-                                          'B07010_038E':'mov_oc_15000_23',
-                                          'B07010_039E':'mov_oc_25000_23',
-                                          'B07010_040E':'mov_oc_35000_23',
-                                          'B07010_041E':'mov_oc_50000_23',
-                                          'B07010_042E':'mov_oc_65000_23',
-                                          'B07010_043E':'mov_oc_75000_23',
-                                          'B07010_044E':'mov_oc_76000_more_23',
-                                          'B07010_047E':'mov_os_w_income_23',
-                                          'B07010_048E':'mov_os_9000_23',
-                                          'B07010_049E':'mov_os_15000_23',
-                                          'B07010_050E':'mov_os_25000_23',
-                                          'B07010_051E':'mov_os_35000_23',
-                                          'B07010_052E':'mov_os_50000_23',
-                                          'B07010_053E':'mov_os_65000_23',
-                                          'B07010_054E':'mov_os_75000_23',
-                                          'B07010_055E':'mov_os_76000_more_23',
-                                          'B07010_058E':'mov_fa_w_income_23',
-                                          'B07010_059E':'mov_fa_9000_23',
-                                          'B07010_060E':'mov_fa_15000_23',
-                                          'B07010_061E':'mov_fa_25000_23',
-                                          'B07010_062E':'mov_fa_35000_23',
-                                          'B07010_063E':'mov_fa_50000_23',
-                                          'B07010_064E':'mov_fa_65000_23',
-                                          'B07010_065E':'mov_fa_75000_23',
-                                          'B07010_066E':'mov_fa_76000_more_23',
-                                          'B06011_001E':'iinc_23',
-                                          'B19001_002E':'I_10000_23',
-                                          'B19001_003E':'I_15000_23',
-                                          'B19001_004E':'I_20000_23',
-                                          'B19001_005E':'I_25000_23',
-                                          'B19001_006E':'I_30000_23',
-                                          'B19001_007E':'I_35000_23',
-                                          'B19001_008E':'I_40000_23',
-                                          'B19001_009E':'I_45000_23',
-                                          'B19001_010E':'I_50000_23',
-                                          'B19001_011E':'I_60000_23',
-                                          'B19001_012E':'I_75000_23',
-                                          'B19001_013E':'I_100000_23',
-                                          'B19001_014E':'I_125000_23',
-                                          'B19001_015E':'I_150000_23',
-                                          'B19001_016E':'I_200000_23',
-                                          'B19001_017E':'I_201000_23'})
 
 # Download ACS 2012 5-Year Estimates
 # --------------------------------------------------------------------------
@@ -358,8 +366,8 @@ df_sf1_00 = nhgis_to_fips(df_sf1_00)
 df_sf3_00 = nhgis_to_fips(df_sf3_00)
 
 # filter to Sacramento County
-df_sf1_00 = df_sf1_00[df_sf1_00['COUNTYA'].isin(FIPS)]
-df_sf3_00 = df_sf3_00[df_sf3_00['COUNTYA'].isin(FIPS)]
+df_sf1_00 = filter_FIPS_census(df_sf1_00)
+df_sf3_00 = filter_FIPS_census(df_sf3_00)
 # -------------------------------
 # Rename variables (MATCHES YOUR SCRIPT)
 # -------------------------------
@@ -488,6 +496,8 @@ path_sf3_90 = input_path + "nhgis_ca_sf3_1990_tract.csv"
 
 df_vars_90 = load_nhgis_csv(path_sf3_90)
 df_vars_90 = nhgis_to_fips(df_vars_90)
+df_vars_90 = filter_FIPS_census(df_vars_90)
+
 # Columns to sum
 pop_cols_90 = ['E4S001', 'E4S002', 'E4S003', 'E4S004', 'E4S005']
 # Convert to numeric then sum rows
@@ -613,13 +623,12 @@ audit_renames(sf3_dict_00, meta_00_sf3, title="2000 SF3 Variable Renames")
 # ==========================================================================
 # Export Files
 # ==========================================================================
-# Note: ouput paths can be altered by changing the 'output path variable above'
 
-# Merge 2012 & 2023 files they are both tablulated on 2010 census tract and will be until 2025 acs5 yr
-df_vars_summ = df_vars_23.merge(df_vars_12, on ='FIPS')
+# Merge 2012 & 2024 files they are both tablulated on 2010 census tract and will be until 2025 acs5 yr
+df_vars_summ = df_vars_24.merge(df_vars_12, on ='FIPS')
 
 #Export files to CSV
-df_vars_summ.to_csv(output_path+"downloads/"+city_name.replace(" ", "")+'census_summ_2023.csv')
-df_vars_90.to_csv(output_path+"downloads/"+city_name.replace(" ", "")+'census_90_2023.csv')
-df_vars_00.to_csv(output_path+"downloads/"+city_name.replace(" ", "")+'census_00_2023.csv')
+df_vars_summ.to_csv(output_path+'downloads/'+city_name.replace(" ", "")+'census_summ_2024.csv')
+df_vars_90.to_csv(output_path+'downloads/'+city_name.replace(" ", "")+'census_90_2024.csv')
+df_vars_00.to_csv(output_path+'downloads/'+city_name.replace(" ", "")+'census_00_2024.csv')
 
