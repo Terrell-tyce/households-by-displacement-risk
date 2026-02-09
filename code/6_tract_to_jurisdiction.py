@@ -32,8 +32,8 @@ def format_summary(df, group_col, o_col='ohu_24', r_col='rhu_24'):
     })
     
     # Add commas for readability
-    summary['Owner Occupied'] = summary['Owner Occupied']
-    summary['Renter Occupied'] = summary['Renter Occupied']
+    summary['Owner Occupied'] = summary['Owner Occupied'].round()
+    summary['Renter Occupied'] = summary['Renter Occupied'].round()
     
     return summary
 
