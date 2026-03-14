@@ -625,7 +625,7 @@ audit_renames(sf3_dict_00, meta_00_sf3, title="2000 SF3 Variable Renames")
 # ==========================================================================
 
 # Merge 2012 & 2024 files they are both tablulated on 2010 census tract and will be until 2025 acs5 yr
-df_vars_summ = df_vars_24.merge(df_vars_12, on ='FIPS')
+df_vars_summ = df_vars_24.merge(df_vars_12, on ='FIPS',how='left')
 
 #Export files to CSV
 df_vars_summ.to_csv(output_path+'downloads/'+city_name.replace(" ", "")+'census_summ_2024.csv')

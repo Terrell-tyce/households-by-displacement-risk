@@ -35,6 +35,8 @@ typology_input = pd.read_csv(
     output_path + '/databases/' + city_name.replace(" ", "") + '_database_2024.csv',
     index_col=0
 )
+# Drop rows where geometry is NaN
+typology_input = typology_input.dropna(subset=['geometry'])
 
 typology_input['geometry'] = typology_input['geometry'].apply(wkt.loads)
 geo_typology_input = gpd.GeoDataFrame(typology_input, geometry='geometry')
@@ -612,7 +614,7 @@ print(df['typ_simplified_name'])
 df['FIPS'] = df['GEO_ID'].str.split('US').str[1]
 df_export= df.drop(columns=["geometry"])
 
-df_export.to_csv("check typology export.csv")
+
 df_export.to_csv(
     output_path + '/typologies/' + city_name.replace(" ", "") + '_typology_output.csv'
 )

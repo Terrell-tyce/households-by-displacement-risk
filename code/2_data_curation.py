@@ -373,7 +373,7 @@ def income_interpolation (census, year, cutoff, mhinc, tot_var, var_suffix, out)
     df = df.drop(columns = [cumulative])
     prop_col = df.columns[df.columns.str[0:4]=='prop']
     df = df.drop(columns = prop_col)
-    census = census.merge (df[['FIPS', income]], on = 'FIPS')
+    census = census.merge (df[['FIPS', income]], on = 'FIPS',how = 'left')
     return census
 
 census = income_interpolation (census, '24', 0.8, rm_hinc_24, 'hh_24', 'I', 'inc')
@@ -612,7 +612,7 @@ def income_interpolation_movein (census, year, cutoff, rm_iinc):
     prop_col = df.columns[df.columns.str[0:4]=='prop']
     df = df.drop(columns = prop_col)
     col_list = [per_limove]+['mov_tot_w_income_'+year]
-    census = census.merge (df[['FIPS'] + col_list], on = 'FIPS')
+    census = census.merge (df[['FIPS'] + col_list], on = 'FIPS',how = 'left')
     return census
 
 census = income_interpolation_movein (census, '24', 0.8, rm_iinc_24)
@@ -755,7 +755,7 @@ pums.loc[pums['lmh_flag_encoded']==6, 'lmh_flag_category'] = 'aff_mix_high'
 
 pums.groupby('lmh_flag_category').count()['FIPS']
 
-census = census.merge(pums[['FIPS', 'lmh_flag_encoded', 'lmh_flag_category']], on = 'FIPS')
+census = census.merge(pums[['FIPS', 'lmh_flag_encoded', 'lmh_flag_category']], on = 'FIPS', how = 'left')
 
 len(census)
 
@@ -863,7 +863,7 @@ zillow['ab_90percentile_ch'] = np.where(zillow['per_ch_zillow_12_24']>percentile
 census['FIPS']=census['FIPS'].astype(str)
 zillow['FIPS']=zillow['FIPS'].astype(str)
 
-census_zillow = census.merge(zillow[['FIPS', 'per_ch_zillow_12_24', 'ab_50pct_ch', 'ab_90percentile_ch']], on = 'FIPS')
+census_zillow = census.merge(zillow[['FIPS', 'per_ch_zillow_12_24', 'ab_50pct_ch', 'ab_90percentile_ch']], on = 'FIPS', how = 'left')
 
 print(f"Merge Check: Found {census_zillow['per_ch_zillow_12_24'].notna().sum()} matches out of {len(census_zillow)} rows")
 

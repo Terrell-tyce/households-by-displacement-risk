@@ -105,14 +105,17 @@ print("Preparing block population...")
 
 gdf_blocks = gdf_blocks.rename(columns={
     'GEOID': 'BLOCK_GEOID',
-    'POP100': 'POP'
+    'POP100': 'POP',
+    'HU100': 'HU'
 })
-
-gdf_blocks = gdf_blocks[['BLOCK_GEOID', 'POP', 'geometry']].copy()
+print(gdf_blocks.columns)
+gdf_blocks = gdf_blocks[['BLOCK_GEOID', 'POP', 'HU', 'geometry']].copy()
 gdf_blocks['POP'] = gdf_blocks['POP'].fillna(0)
+gdf_blocks['HU'] = gdf_blocks['HU'].fillna(0)
 
 if gdf_blocks.crs.is_geographic:
     gdf_blocks = gdf_blocks.to_crs(gdf_tracts.crs)
+
 
 # =============================================================================
 # STEP 2 — BLOCK → TRACT JOIN
@@ -150,38 +153,39 @@ gdf_block_juris['pop_piece'] = (
 )
 
 # =============================================================================
-# STEP 4 — TRACT × JURIS POP SCALAR
+# STEP 4 — TRACT × JURIS HU SCALAR
 # =============================================================================
 print("Computing tract-jurisdiction scalars...")
 
-tract_juris_pop = (
-    gdf_block_juris.groupby(['GEOCODE','JURIS'])['pop_piece']
-    .sum()
-    .reset_index()
+gdf_block_juris['hu_piece'] = (
+    gdf_block_juris['HU'] *
+    (gdf_block_juris['piece_area'] / gdf_block_juris['block_area'])
 )
 
-tract_tot_pop = (
-    gdf_block_juris.groupby('GEOCODE')['pop_piece']
-    .sum()
-    .reset_index()
-    .rename(columns={'pop_piece':'tract_pop'})
+tract_juris_hu = (
+    gdf_block_juris.groupby(['GEOCODE','JURIS'])['hu_piece']
+    .sum().reset_index()
 )
-
-tract_juris_pop = tract_juris_pop.merge(tract_tot_pop, on='GEOCODE')
-tract_juris_pop['pop_scalar'] = tract_juris_pop['pop_piece'] / tract_juris_pop['tract_pop']
+tract_tot_hu = (
+    gdf_block_juris.groupby('GEOCODE')['hu_piece']
+    .sum().reset_index()
+    .rename(columns={'hu_piece':'tract_hu'})
+)
+tract_juris_hu = tract_juris_hu.merge(tract_tot_hu, on='GEOCODE')
+tract_juris_hu['hu_scalar'] = tract_juris_hu['hu_piece'] / tract_juris_hu['tract_hu']
 
 # =============================================================================
-# STEP 5 — MERGE SCALARS INTO TYPOLOGY
+# STEP 5 — MERGE SCALAR INTO TYPOLOGY
 # =============================================================================
 print("Joining scalars to typology...")
 
 clean_typ_overlay = clean_typ_overlay.merge(
-    tract_juris_pop[['GEOCODE','JURIS','pop_scalar']],
+    tract_juris_hu[['GEOCODE','JURIS','hu_scalar']],
     on=['GEOCODE','JURIS'],
     how='left'
 )
 
-clean_typ_overlay['pop_scalar'] = clean_typ_overlay['pop_scalar'].fillna(1)
+clean_typ_overlay['hu_scalar'] = clean_typ_overlay['hu_scalar'].fillna(0)
 
 # =============================================================================
 # STEP 6 — SCALE HOUSING COUNTS
@@ -189,12 +193,11 @@ clean_typ_overlay['pop_scalar'] = clean_typ_overlay['pop_scalar'].fillna(1)
 print("Scaling housing counts...")
 
 for col in ['ohu_24','rhu_24','hh_24']:
-    clean_typ_overlay[col] = clean_typ_overlay[col] * clean_typ_overlay['pop_scalar']
+    clean_typ_overlay[col] = clean_typ_overlay[col] * clean_typ_overlay['hu_scalar']
 
-# ==============================================================
+# =============================================================================
 # FINAL SUMMARIES
-# ==============================================================
-
+# =============================================================================
 print("Creating final weighted summaries...")
 
 regional_summary = summarize_typology_region(clean_typ_overlay)
@@ -219,5 +222,25 @@ regional_summary.to_csv(output_path+"/typologies/region_typology_summary.csv", i
 df_jur_summaries.to_csv(output_path+"/typologies/jurisdiction_typology_summary.csv", index=False)
 df_county_summaries.to_csv(output_path+"/typologies/county_typology_summary.csv", index=False)
 
+# Diagnostic
+# elk = clean_typ_overlay[clean_typ_overlay['JURIS'] == 'Elk Grove']
+# print(f"\nElk Grove tracts: {elk['GEOCODE'].nunique()}")
+# print(f"Elk Grove ohu_24: {elk['ohu_24'].sum():,.0f}")
+# print(f"Elk Grove rhu_24: {elk['rhu_24'].sum():,.0f}")
 
+# missing = ['06067009333','06067009334','06067009335','06067009336',
+#            '06067009642','06067009643','06067009644','06067009645',
+#            '06067009646','06067009647','06067009648','06067009649',
+#            '06067009650','06067009651','06067009652','06067009653']
 
+# print("In gdf_overlay (spatial):    ", gdf_overlay['GEOCODE'].isin(missing).sum())
+# print("In df_typol (typology CSV):  ", df_typol['GEOCODE'].isin(missing).sum())
+# print("In typ_overlay_merge:        ", typ_overlay_merge['GEOCODE'].isin(missing).sum())
+# print("In clean_typ_overlay:        ", clean_typ_overlay['GEOCODE'].isin(missing).sum())
+
+# curation = pd.read_csv(output_path + '/downloads/SACOGcensus_summ_2024.csv', dtype={'FIPS': str})
+# print("Missing tracts in curation output:", curation['FIPS'].isin(missing).sum())
+
+# # Also check the database file that feeds into typology
+# database = pd.read_csv(output_path + '/databases/SACOG_database_2024.csv', dtype={'FIPS': str})
+# print("Missing tracts in database:       ", database['FIPS'].isin(missing).sum())
